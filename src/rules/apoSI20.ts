@@ -344,57 +344,185 @@ function checkMSAQAusgleich(f: MSAFaecher): boolean {
   return fg1Ausgleich || fg2Ausgleich
 }
 
+// ─── Protokoll-Hilfsfunktionen ─────────────────────────────────────────────
+
+function fachLabel(f: FGFach): string {
+  return f.fgNiveau === 'X' ? `${f.kuerzel}(${f.fgNote})` : `${f.kuerzel}(${f.fgNiveau},${f.fgNote})`
+}
+
+function fgStr(fg: FGFach[]): string {
+  return fg.length > 0 ? fg.map(fachLabel).join(', ') : '–'
+}
+
+function ignoriertStr(faecher: EingabeFach[], extraIgno: Set<string> = new Set()): string {
+  const ign = faecher
+    .filter(f => {
+      const kz = normKuerzel(f.kuerzel)
+      return APO20_IGNO.has(kz) || extraIgno.has(kz) || isZusatzFS(f)
+    })
+    .map(f => normKuerzel(f.kuerzel))
+  return ign.length > 0 ? ign.join(', ') : ''
+}
+
+function defStr(fg: FGFach[], schwelle1NS: (f: FGFach) => boolean): string {
+  const defs = fg.filter(schwelle1NS)
+  return defs.map(fachLabel).join(', ')
+}
+
+const esaDef = (f: FGFach) =>
+  f.fgNote >= 5
+
+const msaDef1 = (f: FGFach) =>
+  (f.fgNiveau === 'E' && f.fgNote >= 5) || (f.fgNiveau === 'G' && f.fgNote >= 4) || (f.fgNiveau === 'X' && f.fgNote >= 5)
+
+const msaqDef1 = (f: FGFach) =>
+  (f.fgNiveau === 'E' && f.fgNote >= 4) || (f.fgNiveau === 'G' && f.fgNote >= 3) || (f.fgNiveau === 'X' && f.fgNote >= 4)
+
 // ─── Hauptlogik ────────────────────────────────────────────────────────────
 
-function berechneApoSI20(jahrgang: string | null, faecher: EingabeFach[]): AbschlussTyp {
+function berechneApoSI20(jahrgang: string | null, faecher: EingabeFach[]): { abschluss: AbschlussTyp; protokoll: string[] } {
+  const log: string[] = []
+  const L = (s: string) => log.push(s)
+
   let esaErreicht = false
   let prognose: AbschlussTyp = 'OA'
 
-  // ESA prüfen
+  // ── ESA ────────────────────────────────────────────────────────────────
+  L('Prüfe ESA')
+  L('─────────')
   if (jahrgang === '10') {
     esaErreicht = true
     prognose = 'ESA'
+    L('  Jg. 10 → automatisch (§40 Abs. 3)')
+    L('  ✓ ESA')
   } else {
+    const igno = ignoriertStr(faecher, new Set(['LBNW']))
+    if (igno) L(`  Ignoriere: ${igno}`)
     const esaFG = buildFG_ESA(faecher)
-    if (esaFG !== null && isEESA(esaFG.fg1, esaFG.fg2)) {
-      esaErreicht = true
-      prognose = 'ESA'
+    if (esaFG === null) {
+      L('  FG1 oder FG2 leer → nicht prüfbar')
+    } else {
+      L(`  FG1: ${fgStr(esaFG.fg1)}`)
+      L(`  FG2: ${fgStr(esaFG.fg2)}`)
+      const d1 = defStr(esaFG.fg1, esaDef)
+      const d2 = defStr(esaFG.fg2, esaDef)
+      if (d1) L(`  Defizite FG1: ${d1}`)
+      if (d2) L(`  Defizite FG2: ${d2}`)
+      if (isEESA(esaFG.fg1, esaFG.fg2)) {
+        esaErreicht = true
+        prognose = 'ESA'
+        L('  ✓ ESA')
+      } else {
+        L('  ✗ ESA nicht erreicht')
+      }
     }
   }
 
-  // EESA prüfen (immer, unabhängig von ESA)
+  // ── EESA ───────────────────────────────────────────────────────────────
+  L('')
+  L('Prüfe EESA')
+  L('──────────')
+  const ignoEESA = ignoriertStr(faecher, new Set(['BI', 'CH', 'PH']))
+  if (ignoEESA) L(`  Ignoriere: ${ignoEESA}`)
   const eesaFG = buildFG_EESA(faecher)
-  if (eesaFG !== null && isEESA(eesaFG.fg1, eesaFG.fg2)) {
-    prognose = 'EESA'
+  if (eesaFG === null) {
+    L('  Kein LBNW → nicht prüfbar')
+  } else {
+    L(`  FG1: ${fgStr(eesaFG.fg1)}`)
+    L(`  FG2: ${fgStr(eesaFG.fg2)}`)
+    const d1 = defStr(eesaFG.fg1, esaDef)
+    const d2 = defStr(eesaFG.fg2, esaDef)
+    if (d1) L(`  Defizite FG1: ${d1}`)
+    if (d2) L(`  Defizite FG2: ${d2}`)
+    if (isEESA(eesaFG.fg1, eesaFG.fg2)) {
+      prognose = 'EESA'
+      L('  ✓ EESA')
+    } else {
+      L('  ✗ EESA nicht erreicht')
+    }
   }
 
-  // MSA/MSAQ nur wenn Prognose ≠ OA
+  // ── MSA / MSAQ ─────────────────────────────────────────────────────────
   if (prognose !== 'OA') {
+    L('')
+    L('Prüfe MSA')
+    L('─────────')
     const msaF = buildFG_MSA(faecher, false)
-    if (msaF !== null) {
+    if (msaF === null) {
+      L('  Kein NW-Fach mit FLD (CH/PH/BI) → nicht prüfbar')
+    } else {
+      const fldFach = faecher.find(f => normKuerzel(f.kuerzel) === msaF.fldNW)
+      L(`  FLD-NW: ${msaF.fldNW} (${fldFach?.kursart ?? '?'}-Kurs)`)
+      L(`  FG1: ${fgStr(msaF.fg1)}`)
+      L(`  FG2: ${fgStr(msaF.fg2)}`)
+      const d1 = defStr(msaF.fg1, msaDef1)
+      const d2 = defStr(msaF.fg2, msaDef1)
+      if (d1) L(`  Defizite FG1: ${d1}`)
+      if (d2) L(`  Defizite FG2: ${d2}`)
+
       const { passes, checkAusgleich } = isMSA(msaF)
-      if (passes || (checkAusgleich && checkMSAAusgleich(msaF))) {
+      if (passes) {
         prognose = 'MSA'
+        L('  ✓ MSA (direkter Pass)')
+      } else if (checkAusgleich && checkMSAAusgleich(msaF)) {
+        prognose = 'MSA'
+        L('  ✓ MSA (mit Ausgleich)')
+      } else {
+        L(checkAusgleich ? '  ✗ MSA: Ausgleich nicht möglich' : '  ✗ MSA: Defizite zu hoch')
+      }
+
+      if (prognose === 'MSA') {
+        L('')
+        L('Prüfe MSA-Q')
+        L('───────────')
         const msaqF = buildFG_MSA(faecher, true)
         if (msaqF !== null) {
+          L(`  FG1: ${fgStr(msaqF.fg1)}`)
+          L(`  FG2: ${fgStr(msaqF.fg2)}`)
+          const qd1 = defStr(msaqF.fg1, msaqDef1)
+          const qd2 = defStr(msaqF.fg2, msaqDef1)
+          if (qd1) L(`  Defizite FG1: ${qd1}`)
+          if (qd2) L(`  Defizite FG2: ${qd2}`)
+
+          const eAnzQ = msaqF.fg1.filter(f => f.fgNiveau === 'E').length + msaqF.fg2.filter(f => f.fgNiveau === 'E').length
           const { passes: qP, checkAusgleich: qA } = isMSAQ(msaqF)
-          if (qP || (qA && checkMSAQAusgleich(msaqF))) prognose = 'MSA_Q'
+          if (qP || (qA && checkMSAQAusgleich(msaqF))) {
+            prognose = 'MSA_Q'
+            L(qP ? '  ✓ MSA-Q (direkter Pass)' : '  ✓ MSA-Q (mit Ausgleich)')
+          } else if (qA) {
+            L('  ✗ MSA-Q: Ausgleich nicht möglich')
+          } else if (eAnzQ < 3) {
+            L(`  ✗ MSA-Q: Zu wenig E-Kurs-Fächer (${eAnzQ} von 3 benötigt)`)
+          } else {
+            L('  ✗ MSA-Q: Defizite zu hoch')
+          }
         }
       }
     }
   }
 
-  // ESA nicht erreicht → OA (überschreibt auch EESA/MSA)
-  if (!esaErreicht) prognose = 'OA'
+  // ── ESA nicht erreicht → OA ────────────────────────────────────────────
+  if (!esaErreicht) {
+    prognose = 'OA'
+    L('')
+    L('  ⚠ ESA nicht erreicht → Ohne Abschluss')
+  }
 
-  return prognose
+  L('')
+  L(`══ Ergebnis: ${prognose} ══`)
+
+  return { abschluss: prognose, protokoll: log }
 }
 
 // ─── Regelwerk-Export ──────────────────────────────────────────────────────
 
-export const apoSI20Regelwerk: Regelwerk = (input): RegelwerkErgebnis => ({
-  empfehlung: berechneApoSI20(input.jahrgang, input.faecher),
-  alternativen: [],
-  hinweise: [],
-  vollstaendig: true,
-})
+export const apoSI20Regelwerk: Regelwerk = (input): RegelwerkErgebnis => {
+  const { abschluss, protokoll } = berechneApoSI20(input.jahrgang, input.faecher)
+  return {
+    empfehlung: abschluss,
+    alternativen: [],
+    hinweise: [],
+    vollstaendig: true,
+    protokoll,
+  }
+}

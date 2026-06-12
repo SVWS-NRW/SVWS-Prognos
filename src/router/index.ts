@@ -16,9 +16,21 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
-      path: '/auswahl',
-      name: 'auswahl',
+      path: '/jahrgang/:jg',
+      name: 'jahrgang',
       component: () => import('@/views/SchuelerauswahlView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/manuell',
+      name: 'manuell',
+      component: () => import('@/views/ManuellePrognoseView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/auswertungen',
+      name: 'auswertungen',
+      component: () => import('@/views/AuswertungenView.vue'),
       meta: { requiresAuth: true },
     },
     {
