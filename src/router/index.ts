@@ -24,7 +24,7 @@ const router = createRouter({
     {
       path: '/schueler/:id/notenbilder',
       name: 'notenbilder',
-      component: () => import('@/views/NotenbidView.vue'),
+      component: () => import('@/views/NotenbildView.vue'),
       meta: { requiresAuth: true },
     },
     {

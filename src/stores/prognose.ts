@@ -1,15 +1,15 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import type { PrognoseErgebnis } from '@/models/PrognoseErgebnis'
-import type { NotenbidSchueler } from '@/models/Lernabschnitt'
+import type { NotenbildSchueler } from '@/models/Lernabschnitt'
 
 export const usePrognoseStore = defineStore('prognose', () => {
-  const notenbilder = ref<Map<number, NotenbidSchueler>>(new Map())
+  const notenbilder = ref<Map<number, NotenbildSchueler>>(new Map())
   const ergebnisse = ref<Map<number, PrognoseErgebnis>>(new Map())
   const laedt = ref(false)
   const schreibt = ref(false)
 
-  function setNotenbid(schuelerId: number, daten: NotenbidSchueler): void {
+  function setNotenbild(schuelerId: number, daten: NotenbildSchueler): void {
     notenbilder.value.set(schuelerId, daten)
   }
 
@@ -21,7 +21,7 @@ export const usePrognoseStore = defineStore('prognose', () => {
     return ergebnisse.value.get(schuelerId)
   }
 
-  function getNotenbid(schuelerId: number): NotenbidSchueler | undefined {
+  function getNotenbild(schuelerId: number): NotenbildSchueler | undefined {
     return notenbilder.value.get(schuelerId)
   }
 
@@ -30,5 +30,5 @@ export const usePrognoseStore = defineStore('prognose', () => {
     ergebnisse.value.clear()
   }
 
-  return { laedt, schreibt, setNotenbid, setErgebnis, getErgebnis, getNotenbid, clear }
+  return { laedt, schreibt, setNotenbild, setErgebnis, getErgebnis, getNotenbild, clear }
 })

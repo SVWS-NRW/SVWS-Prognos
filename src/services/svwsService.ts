@@ -1,6 +1,6 @@
 import { getApiClient } from './apiClient'
 import type { Schuljahresabschnitt, Klasse, Schueler } from '@/models/Schueler'
-import type { NotenbidSchueler } from '@/models/Lernabschnitt'
+import type { NotenbildSchueler } from '@/models/Lernabschnitt'
 
 export async function loadSchuljahresabschnitte(): Promise<Schuljahresabschnitt[]> {
   const { data } = await getApiClient().get('/schuljahresabschnitte/')
@@ -22,7 +22,7 @@ export async function loadSchueler(klasseId: number): Promise<Schueler[]> {
   return data as Schueler[]
 }
 
-export async function loadNotenbid(schuelerId: number): Promise<NotenbidSchueler> {
+export async function loadNotenbild(schuelerId: number): Promise<NotenbildSchueler> {
   const { data } = await getApiClient().get(`/schueler/${schuelerId}/lernabschnitte/`)
   // TODO: Mapping SVWS-Format → internes Modell
   return { schuelerId, lernabschnitte: data }

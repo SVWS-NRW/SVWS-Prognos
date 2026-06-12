@@ -20,7 +20,7 @@ export interface Lernabschnitt {
   leistungen: Leistung[]
 }
 
-export interface NotenbidSchueler {
+export interface NotenbildSchueler {
   schuelerId: number
   lernabschnitte: Lernabschnitt[]
 }
