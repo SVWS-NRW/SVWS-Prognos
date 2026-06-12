@@ -1,5 +1,6 @@
 <template>
   <div class="connect-wrapper">
+    <ThemeToggle class="connect-theme" />
     <div class="connect-card">
       <h1>SVWS Prognos</h1>
       <p class="subtitle">Verbindung zum SVWS-Server</p>
@@ -63,6 +64,7 @@ import Password from 'primevue/password'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
 import { useAuthStore } from '@/stores/auth'
+import ThemeToggle from '@/components/ThemeToggle.vue'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -94,9 +96,16 @@ async function handleConnect() {
 <style scoped>
 .connect-wrapper {
   min-height: 100vh;
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.connect-theme {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
 }
 
 .connect-card {

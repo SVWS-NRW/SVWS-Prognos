@@ -21,6 +21,7 @@ export interface RegelwerkErgebnis {
   alternativen: AbschlussTyp[]
   hinweise: PrognoseHinweis[]
   vollstaendig: boolean
+  protokoll: string[]
 }
 
 export type Regelwerk = (input: RegelwerkInput) => RegelwerkErgebnis
