@@ -1,0 +1,85 @@
+/* ── Emerald Design Tokens (ADR 0017) ─────────────────────────────────────── */
+:root {
+  --accent:        #059669;
+  --accent-hover:  #047857;
+  --bg-a:          #edfbf4;
+  --bg-b:          #f0fdf9;
+  --surface:       #ffffff;
+  --app-bg:        #f8fafc;
+  --app-accent:    #059669;
+  --app-ink:       #1e293b;
+  --app-border:    #cbd5e1;
+
+  /* PrimeVue Primary auf Emerald */
+  --p-primary-color:       #059669;
+  --p-primary-hover-color: #047857;
+
+  /* Notenfarben (fachliche Semantik, nicht überschreiben) */
+  --n1: #16a34a;
+  --n2: #65a30d;
+  --n3: #ca8a04;
+  --n4: #ea580c;
+  --n5: #dc2626;
+  --n6: #991b1b;
+
+  /* Abschluss-Ampelfarben */
+  --abschluss-sicher:    #16a34a;
+  --abschluss-unsicher:  #ca8a04;
+  --abschluss-nicht:     #dc2626;
+}
+
+:root.dark {
+  --accent:        #34d399;
+  --accent-hover:  #6ee7b7;
+  --bg-a:          #091c19;
+  --bg-b:          #0c1a14;
+  --surface:       #142b25;
+  --app-bg:        #0d201c;
+  --app-accent:    #34d399;
+  --app-ink:       #f1f5f9;
+  --app-border:    #2a4040;
+
+  --p-primary-color:       #34d399;
+  --p-primary-hover-color: #6ee7b7;
+
+  --n1: #4ade80;
+  --n2: #a3e635;
+  --n3: #fbbf24;
+  --n4: #fb923c;
+  --n5: #f87171;
+  --n6: #fca5a5;
+
+  --abschluss-sicher:    #4ade80;
+  --abschluss-unsicher:  #fbbf24;
+  --abschluss-nicht:     #f87171;
+}
+
+/* ── Body ─────────────────────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, sans-serif;
+  background:
+    radial-gradient(circle at 10% 20%, rgba(5, 150, 105, 0.10), transparent 38%),
+    radial-gradient(circle at 90% 15%, rgba(15, 143, 143, 0.10), transparent 30%),
+    linear-gradient(140deg, var(--bg-a), var(--bg-b));
+  min-height: 100vh;
+  color: var(--app-ink);
+}
+
+/* ── Native Spinbuttons ausblenden (ADR 0017) ─────────────────────────────── */
+input[type='number'] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+}

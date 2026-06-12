@@ -1,0 +1,41 @@
+# Abhängigkeiten
+node_modules/
+
+# Build-Ausgabe
+dist/
+dist-ssr/
+release/
+
+# Umgebungsvariablen (enthalten ggf. Zugangsdaten)
+.env
+.env.local
+.env.*.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Betriebssystem
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# TypeScript-Cache
+*.tsbuildinfo
+
+# Quellcode der alten Delphi-Anwendung (nur zur lokalen Analyse, nicht einchecken)
+delphiSrc/
+
+# Testfälle aus der alten Anwendung (lokale Referenzdaten)
+test-json/
