@@ -54,6 +54,11 @@
   --abschluss-nicht:     #f87171;
 }
 
+/* ── Browser-Zoom (Electron hat festes 1400×900-Fenster, Browser nicht) ────── */
+html.browser {
+  font-size: 80%; /* skaliert alle rem-basierten PrimeVue-Komponenten, vh-Einheiten bleiben unberührt */
+}
+
 /* ── Body ─────────────────────────────────────────────────────────────────── */
 *,
 *::before,

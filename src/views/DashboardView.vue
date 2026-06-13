@@ -77,6 +77,8 @@
             <dd class="url">{{ auth.baseUrl }}</dd>
             <dt>Benutzer</dt>
             <dd>{{ auth.username }}</dd>
+            <dt>Abschnitt</dt>
+            <dd>{{ abschnittStore.ausgewaehlt?.bezeichnung ?? '–' }}</dd>
           </dl>
         </div>
       </div>
@@ -88,10 +90,12 @@
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import { useAuthStore } from '@/stores/auth'
+import { useSchuljahresabschnittStore } from '@/stores/schuljahresabschnitt'
 import ThemeToggle from '@/components/ThemeToggle.vue'
 
 const router = useRouter()
 const auth = useAuthStore()
+const abschnittStore = useSchuljahresabschnittStore()
 
 function handleLogout() {
   auth.disconnect()
