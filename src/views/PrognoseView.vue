@@ -3,8 +3,24 @@
 
     <!-- Toolbar -->
     <div class="toolbar">
+      <Button
+        icon="pi pi-list"
+        text
+        size="small"
+        title="Zurück zur Schülertabelle"
+        @click="router.push({ name: 'jahrgang', params: { jg: jahrgang ?? '' } })"
+      />
       <Button icon="pi pi-arrow-left" text size="small" @click="router.back()" />
       <span class="toolbar-title">{{ schuelerName }}</span>
+      <Button
+        v-if="naechsterSchueler"
+        icon="pi pi-arrow-right"
+        text
+        size="small"
+        class="btn-naechster"
+        :title="`Nächster: ${naechsterSchueler.nachname}, ${naechsterSchueler.vorname}`"
+        @click="navigiereZuNaechstem"
+      />
       <div class="toolbar-sep" />
       <Select
         v-model="selectedAbschnittId"
@@ -52,7 +68,34 @@
           <div class="btn-group">
             <Button icon="pi pi-plus" label="Fach hinzufügen" outlined size="small" @click="addFach" />
             <Button icon="pi pi-refresh" label="Neu laden" outlined size="small" severity="secondary" @click="() => laden()" />
+            <Button icon="pi pi-save" label="Speichern" outlined size="small" severity="success" :loading="speichert" :disabled="!hasChanges" @click="speichern" />
           </div>
+        </div>
+
+        <!-- Abschluss-Leiste -->
+        <div class="abschluss-bar">
+          <div class="abschluss-field">
+            <label class="abschluss-label">Prüfungsordnung</label>
+            <Select
+              v-model="selectedPO"
+              :options="poOptionen"
+              option-label="label"
+              option-value="value"
+              size="small"
+              show-clear
+              placeholder="–"
+              class="po-select"
+            />
+          </div>
+          <div class="abschluss-field">
+            <label class="abschluss-label">Abschluss (berechnet)</label>
+            <span class="abschluss-wert">{{ berechneterAbschlussAnzeige }}</span>
+          </div>
+          <div class="abschluss-field abschluss-field--check">
+            <Checkbox v-model="istAbschlussPrognose" :binary="true" input-id="ist-prog-chk" />
+            <label for="ist-prog-chk" class="abschluss-label">Ist Prognose</label>
+          </div>
+          <div v-if="speichernFehler" class="speichern-fehler">{{ speichernFehler }}</div>
         </div>
 
         <div v-if="faecher.length > 0" class="table-wrapper">
@@ -177,12 +220,17 @@ import { useSchuljahresabschnittStore } from '@/stores/schuljahresabschnitt'
 import { useFaecherStore } from '@/stores/faecher'
 import {
   loadSvwsLernabschnittsdaten,
+  loadPruefungsordnungen,
+  patchLernabschnittsdaten,
+  patchLeistungsdaten,
   parseNoteString,
 } from '@/services/svwsService'
+import type { SvwsPruefungsordnung } from '@/services/svwsService'
+import type { SvwsLernabschnittsdaten } from '@/models/Lernabschnitt'
 
 const route = useRoute()
 const router = useRouter()
-const schuelerId = Number(route.params.id)
+const schuelerId = computed(() => Number(route.params.id))
 
 const authStore = useAuthStore()
 const schuelerStore = useSchuelerStore()
@@ -200,6 +248,7 @@ interface FormFach {
 interface RohFach extends FormFach {
   noteHalbjahr: number | null
   noteQuartal: number | null
+  svwsId: number
 }
 
 const laedt = ref(false)
@@ -210,6 +259,73 @@ const jahrgang = ref<string | null>(null)
 const schulform = ref<Schulform>(authStore.schulform)
 const notenModus = ref<'halbjahr' | 'quartal'>('halbjahr')
 const selectedAbschnittId = ref<number | null>(abschnittStore.ausgewaehltId)
+
+const rawLernabschnitt = ref<SvwsLernabschnittsdaten | null>(null)
+const pruefungsordnungen = ref<SvwsPruefungsordnung[]>([])
+const selectedPO = ref<string | null>('APO-SI20')
+const istAbschlussPrognose = ref(true)
+const speichert = ref(false)
+const speichernFehler = ref<string | null>(null)
+
+const SCHULFORM_KUERZEL: Record<string, string> = {
+  GESAMTSCHULE: 'GE', SEKUNDARSCHULE: 'SK', PRIMUSSCHULE: 'PR',
+}
+
+// Mapping: Prognose-Empfehlung → SVWS-Abschluss-Code (APO-SI20-Nomenklatur)
+const EMPFEHLUNG_ZU_SVWS: Record<string, string> = {
+  OA: 'OA', ESA: 'ESA', EESA: 'HA10', MSA: 'MSA', MSA_Q: 'MSA-Q',
+}
+
+const ABSCHLUSS_LABEL: Record<string, string> = {
+  OA: 'Ohne Abschluss', ESA: 'ESA', HA: 'HA9', HA10: 'HA10',
+  FOR: 'MSA', 'FORQ-E': 'MSA/Q', MSA: 'MSA', 'MSA-Q': 'MSA/Q',
+}
+
+const berechneterAbschlussCode = computed(() =>
+  ergebnis.value ? (EMPFEHLUNG_ZU_SVWS[ergebnis.value.empfehlung] ?? null) : null
+)
+
+const berechneterAbschlussAnzeige = computed(() => {
+  const code = berechneterAbschlussCode.value
+  if (!code) return '–'
+  return ABSCHLUSS_LABEL[code] ? `${code} – ${ABSCHLUSS_LABEL[code]}` : code
+})
+
+// Eindeutige PO-Namen aus der API (z.B. "APO-SI20" aus "GE/APO-SI20/5-10")
+const poOptionen = computed(() => {
+  const seen = new Set<string>()
+  const opts: { value: string; label: string }[] = []
+  for (const po of pruefungsordnungen.value) {
+    const parts = po.pruefungsOrdnung.split('/')
+    const poName = parts[1] ?? po.pruefungsOrdnung
+    if (!seen.has(po.pruefungsOrdnung)) {
+      seen.add(po.pruefungsOrdnung)
+      const label = po.bezeichnung ? `${poName} – ${po.bezeichnung}` : poName
+      opts.push({ value: po.pruefungsOrdnung, label })
+    }
+  }
+  if (!opts.find(o => o.value.includes('APO-SI20'))) {
+    const sfKuerzel = SCHULFORM_KUERZEL[schulform.value] ?? 'GE'
+    opts.unshift({ value: `${sfKuerzel}/APO-SI20/5-10`, label: 'APO-SI20' })
+  }
+  return opts
+})
+
+
+const hasChanges = computed(() => {
+  const la = rawLernabschnitt.value
+  if (!la) return false
+  // Abschluss-Speicherung noch nicht implementiert — nur istAbschlussPrognose und Noten prüfen
+  if (istAbschlussPrognose.value !== (la.istAbschlussPrognose ?? !istAbschlussPrognose.value)) return true
+  for (let i = 0; i < rohFaecher.value.length; i++) {
+    const rohF = rohFaecher.value[i]
+    const currentFach = faecher.value[i]
+    if (!currentFach) continue
+    const orig = notenModus.value === 'quartal' ? rohF.noteQuartal : rohF.noteHalbjahr
+    if (currentFach.note !== orig) return true
+  }
+  return false
+})
 
 const abschnittOptionen = computed(() =>
   abschnittStore.abschnitte.map(a => ({ label: a.bezeichnung, value: a.id }))
@@ -239,9 +355,21 @@ const noteOptionen = [
 ]
 
 const schuelerName = computed(() => {
-  const s = schuelerStore.schueler.find(s => s.id === schuelerId)
-  return s ? `${s.nachname}, ${s.vorname}` : `Schüler #${schuelerId}`
+  const s = schuelerStore.schueler.find(s => s.id === schuelerId.value)
+  return s ? `${s.nachname}, ${s.vorname}` : `Schüler #${schuelerId.value}`
 })
+
+const naechsterSchueler = computed(() => {
+  const liste = schuelerStore.schueler
+  const idx = liste.findIndex(s => s.id === schuelerId.value)
+  return idx >= 0 && idx + 1 < liste.length ? liste[idx + 1] : null
+})
+
+function navigiereZuNaechstem() {
+  if (!naechsterSchueler.value) return
+  schuelerStore.waehleSchueler(naechsterSchueler.value.id)
+  router.push({ name: 'prognose', params: { id: String(naechsterSchueler.value.id) } })
+}
 
 const ergebnis = computed(() => {
   const valid = faecher.value.filter(f => f.kuerzel.trim() !== '' && f.note !== null)
@@ -267,7 +395,12 @@ watch(notenModus, () => {
   }))
 })
 
-onMounted(laden)
+watch(schuelerId, () => laden())
+
+onMounted(() => {
+  laden()
+  loadPruefungsordnungen().then(pos => { pruefungsordnungen.value = pos })
+})
 
 async function laden(abschnittIdParam?: number) {
   laedt.value = true
@@ -280,10 +413,38 @@ async function laden(abschnittIdParam?: number) {
 
     await faecherStore.ensureLoaded()
 
-    const lernabschnitt = await loadSvwsLernabschnittsdaten(schuelerId, abschnittId)
+    const lernabschnitt = await loadSvwsLernabschnittsdaten(schuelerId.value, abschnittId)
+    rawLernabschnitt.value = lernabschnitt
 
-    const schueler = schuelerStore.schueler.find(s => s.id === schuelerId)
+    const schueler = schuelerStore.schueler.find(s => s.id === schuelerId.value)
     jahrgang.value = schueler?.jahrgang ?? null
+
+    // Prüfungsordnung aus gespeichertem Abschluss-String ableiten
+    // "GE/APO-SI20/MSA-Q" → passenden PO-Eintrag "GE/APO-SI20/5-10" suchen
+    {
+      const sfKuerzel = SCHULFORM_KUERZEL[schulform.value] ?? 'GE'
+      if (lernabschnitt.abschluss) {
+        const base = lernabschnitt.abschluss.split('/').slice(0, 2).join('/')
+        const match = pruefungsordnungen.value.find(po =>
+          po.pruefungsOrdnung.split('/').slice(0, 2).join('/') === base
+        )
+        selectedPO.value = match?.pruefungsOrdnung ?? null
+      } else {
+        const match = pruefungsordnungen.value.find(po =>
+          po.pruefungsOrdnung.startsWith(`${sfKuerzel}/APO-SI20/`)
+        )
+        selectedPO.value = match?.pruefungsOrdnung ?? `${sfKuerzel}/APO-SI20/5-10`
+      }
+    }
+
+    // IstAbschlussPrognose: gespeicherten Wert nehmen oder Default berechnen
+    if (lernabschnitt.istAbschlussPrognose !== null) {
+      istAbschlussPrognose.value = lernabschnitt.istAbschlussPrognose
+    } else {
+      const jgNum = Number(jahrgang.value)
+      const abschnittNr = abschnittStore.abschnitte.find(a => a.id === abschnittId)?.abschnitt
+      istAbschlussPrognose.value = jgNum < 10 || (jgNum === 10 && abschnittNr === 1)
+    }
 
     rohFaecher.value = lernabschnitt.leistungsdaten
       .map(ld => {
@@ -299,6 +460,7 @@ async function laden(abschnittIdParam?: number) {
           istFremdsprache: fach.istFremdsprache,
           noteHalbjahr: noteHj,
           noteQuartal: noteQ,
+          svwsId: ld.id,
         } satisfies RohFach
       })
       .filter((f): f is RohFach => f !== null)
@@ -315,6 +477,43 @@ async function laden(abschnittIdParam?: number) {
     fehler.value = e?.message ?? 'Prognosedaten konnten nicht geladen werden.'
   } finally {
     laedt.value = false
+  }
+}
+
+async function speichern() {
+  if (!rawLernabschnitt.value) return
+  speichert.value = true
+  speichernFehler.value = null
+  try {
+    const body: Record<string, unknown> = {
+      istAbschlussPrognose: istAbschlussPrognose.value,
+    }
+    if (selectedPO.value) body.pruefungsOrdnung = selectedPO.value
+    await patchLernabschnittsdaten(rawLernabschnitt.value.id, body)
+
+    // Geänderte Noten speichern
+    for (let i = 0; i < rohFaecher.value.length; i++) {
+      const rohF = rohFaecher.value[i]
+      const currentFach = faecher.value[i]
+      if (!currentFach) continue
+      const originalNote = notenModus.value === 'quartal' ? rohF.noteQuartal : rohF.noteHalbjahr
+      if (currentFach.note === originalNote) continue
+      const rawLd = rawLernabschnitt.value.leistungsdaten.find(ld => ld.id === rohF.svwsId)
+      if (!rawLd) continue
+      const noteField = notenModus.value === 'quartal' ? 'noteQuartal' : 'note'
+      const noteStr = currentFach.note !== null ? String(currentFach.note) : null
+      const body = Object.fromEntries(
+        Object.entries({ ...rawLd, [noteField]: noteStr } as Record<string, unknown>)
+          .filter(([, v]) => v !== null)
+      )
+      await patchLeistungsdaten(rawLd.id, body)
+    }
+
+    await laden()
+  } catch (e: any) {
+    speichernFehler.value = e?.message ?? 'Fehler beim Speichern.'
+  } finally {
+    speichert.value = false
   }
 }
 
@@ -375,6 +574,7 @@ function mapKursart(k: string | null): 'E' | 'G' | 'Sonstige' {
   white-space: nowrap;
 }
 .toolbar-sep  { flex: 1; }
+.btn-naechster :deep(.p-button-icon) { color: #16a34a; }
 .abschnitt-select { width: 16rem; flex-shrink: 0; }
 .noten-toggle { flex-shrink: 0; }
 
@@ -523,4 +723,24 @@ function mapKursart(k: string | null): 'E' | 'G' | 'Sonstige' {
 
 .result-icon-leer { font-size: 1.4rem; opacity: 0.3; }
 .result-leer-text { font-size: 0.68rem; line-height: 1.3; }
+
+.abschluss-bar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.3rem 0.5rem;
+  border-bottom: 1px solid var(--p-content-border-color);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.abschluss-field {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.abschluss-field--check { gap: 0.4rem; }
+.abschluss-label { font-size: 0.72rem; color: var(--p-text-muted-color); white-space: nowrap; }
+.po-select      { width: 14rem; }
+.abschluss-select { width: 8rem; }
+.speichern-fehler { font-size: 0.72rem; color: #b91c1c; margin-left: auto; }
 </style>

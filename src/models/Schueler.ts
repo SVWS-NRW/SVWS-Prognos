@@ -36,6 +36,7 @@ export interface Schueler {
   schuljahresabschnittId: number
   svwsAbschluss?: string | null
   svwsIstAbschlussPrognose?: boolean | null
+  svwsPruefungsOrdnung?: string | null
 }
 
 export interface Schuljahresabschnitt {

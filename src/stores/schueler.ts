@@ -69,6 +69,7 @@ export const useSchuelerStore = defineStore('schueler', () => {
                 ...schueler.value[idx],
                 svwsAbschluss: la.abschluss,
                 svwsIstAbschlussPrognose: la.istAbschlussPrognose,
+                svwsPruefungsOrdnung: la.pruefungsOrdnung,
               }
             }
           } catch {

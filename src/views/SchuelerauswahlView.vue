@@ -46,6 +46,7 @@
             <col :style="{ width: spaltenBreiten[2] + 'px' }" />
             <col :style="{ width: spaltenBreiten[3] + 'px' }" />
             <col :style="{ width: spaltenBreiten[4] + 'px' }" />
+            <col :style="{ width: spaltenBreiten[5] + 'px' }" />
             <col />
           </colgroup>
           <thead>
@@ -67,8 +68,12 @@
                 <div class="col-resize-handle" @mousedown.prevent="startResize($event, 3)" />
               </th>
               <th>
-                ist Prognose
+                Prüfungsordnung
                 <div class="col-resize-handle" @mousedown.prevent="startResize($event, 4)" />
+              </th>
+              <th>
+                ist Prognose
+                <div class="col-resize-handle" @mousedown.prevent="startResize($event, 5)" />
               </th>
               <th></th>
             </tr>
@@ -84,13 +89,14 @@
               <td>{{ s.vorname }}</td>
               <td class="td-klasse">{{ s.klasseKuerzel }}</td>
               <td class="td-abschluss">{{ formatAbschluss(s) }}</td>
+              <td class="td-po">{{ formatPruefungsordnung(s) }}</td>
               <td class="td-prognose">{{ formatPrognose(s) }}</td>
               <td class="td-action">
                 <i class="pi pi-chevron-right action-icon" />
               </td>
             </tr>
             <tr v-if="gefiltert.length === 0">
-              <td colspan="6" class="td-empty">Keine Schüler für diesen Filter gefunden.</td>
+              <td colspan="7" class="td-empty">Keine Schüler für diesen Filter gefunden.</td>
             </tr>
           </tbody>
         </table>
@@ -121,8 +127,8 @@ const fehler = ref<string | null>(null)
 const selectedKlasseId = ref<number | null>(null)
 const selectedAbschnittId = ref<number | null>(abschnittStore.ausgewaehltId)
 
-// Spaltenbreiten in px: Nachname, Vorname, Klasse, Abschluss, Prog.
-const spaltenBreiten = ref([150, 130, 85, 130, 110])
+// Spaltenbreiten in px: Nachname, Vorname, Klasse, Abschluss, Prüfungsordnung, ist Prognose
+const spaltenBreiten = ref([150, 130, 85, 100, 140, 110])
 
 const abschnittOptionen = computed(() =>
   abschnittStore.abschnitte.map(a => ({ label: a.bezeichnung, value: a.id }))
@@ -210,6 +216,19 @@ function formatAbschluss(s: { svwsAbschluss?: string | null }): string {
   const parts = s.svwsAbschluss.split('/')
   const kuerzel = parts[parts.length - 1] ?? s.svwsAbschluss
   return ABSCHLUSS_LABEL[kuerzel] ?? kuerzel
+}
+
+function formatPruefungsordnung(s: { svwsPruefungsOrdnung?: string | null; svwsAbschluss?: string | null }): string {
+  if (s.svwsPruefungsOrdnung === undefined && s.svwsAbschluss === undefined) return '…'
+  if (s.svwsPruefungsOrdnung) {
+    const parts = s.svwsPruefungsOrdnung.split('/')
+    return parts.length >= 2 ? parts[1] : s.svwsPruefungsOrdnung
+  }
+  if (s.svwsAbschluss) {
+    const parts = s.svwsAbschluss.split('/')
+    return parts.length >= 2 ? parts[1] : '–'
+  }
+  return '–'
 }
 
 function formatPrognose(s: { svwsIstAbschlussPrognose?: boolean | null }): string {

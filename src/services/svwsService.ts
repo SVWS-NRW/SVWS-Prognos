@@ -101,6 +101,7 @@ export async function loadSvwsLernabschnittsdaten(
     noteLernbereichGSbzwAL: entry.noteLernbereichGSbzwAL ?? null,
     abschluss: entry.abschluss ?? null,
     istAbschlussPrognose: entry.istAbschlussPrognose ?? null,
+    pruefungsOrdnung: entry.pruefungsOrdnung ?? null,
     leistungsdaten: (entry.leistungsdaten ?? []).map((l: any) => ({
       id: l.id,
       fachID: l.fachID,
@@ -109,6 +110,43 @@ export async function loadSvwsLernabschnittsdaten(
       noteQuartal: l.noteQuartal ?? null,
     })),
   }
+}
+
+export interface SvwsPruefungsordnung {
+  // Voller Identifier, z.B. "GE/APO-SI20/5-10"
+  pruefungsOrdnung: string
+  // Abschluss-Code für diesen Eintrag, z.B. "MSA-Q"
+  abschluss: string | null
+  bezeichnung: string | null
+}
+
+export async function loadPruefungsordnungen(): Promise<SvwsPruefungsordnung[]> {
+  try {
+    const { data } = await getApiClient().get('/schild3/pruefungsordnungen')
+    return (Array.isArray(data) ? data : []).map((po: any) => ({
+      pruefungsOrdnung: String(po.pruefungsOrdnung ?? po.kuerzel ?? po.id ?? ''),
+      abschluss: po.abschluss ? String(po.abschluss) : null,
+      bezeichnung: po.bezeichnung ?? po.text ?? null,
+    }))
+  } catch {
+    return []
+  }
+}
+
+export async function patchLernabschnittsdaten(
+  id: number,
+  felder: Record<string, unknown>,
+): Promise<void> {
+  const body = Object.fromEntries(Object.entries(felder).filter(([, v]) => v !== null && v !== undefined))
+  await getApiClient().patch(`/schueler/lernabschnittsdaten/${id}`, body)
+}
+
+export async function patchLeistungsdaten(
+  id: number,
+  data: Record<string, unknown>,
+): Promise<void> {
+  const body = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== null))
+  await getApiClient().patch(`/schueler/leistungsdaten/${id}`, body)
 }
 
 export function parseNoteString(noteStr: string | null | undefined): number | null {

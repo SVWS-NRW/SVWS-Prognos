@@ -24,7 +24,6 @@ clientseitig — kein eigenes Backend.
 |---|---|
 | **Credentials nur im RAM** | Benutzername + Passwort ausschließlich im Pinia-`authStore`. KEIN localStorage, KEIN sessionStorage. |
 | **`delphiSrc/` niemals einchecken** | Enthält alten proprietären Delphi-Quellcode. Steht in `.gitignore`. |
-| **`test-json/` niemals einchecken** | Enthält Schülerdaten als Testfälle. Steht in `.gitignore`. |
 | **Credentials nie loggen** | Weder in Konsole noch in Fehlermeldungen. |
 
 ---
