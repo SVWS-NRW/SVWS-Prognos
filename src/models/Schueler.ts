@@ -34,6 +34,8 @@ export interface Schueler {
   klasseId: number
   klasseKuerzel: string
   schuljahresabschnittId: number
+  svwsAbschluss?: string | null
+  svwsIstAbschlussPrognose?: boolean | null
 }
 
 export interface Schuljahresabschnitt {

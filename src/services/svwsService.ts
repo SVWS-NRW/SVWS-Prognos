@@ -99,6 +99,8 @@ export async function loadSvwsLernabschnittsdaten(
     schuljahresabschnitt: entry.schuljahresabschnitt,
     noteLernbereichNW: entry.noteLernbereichNW ?? null,
     noteLernbereichGSbzwAL: entry.noteLernbereichGSbzwAL ?? null,
+    abschluss: entry.abschluss ?? null,
+    istAbschlussPrognose: entry.istAbschlussPrognose ?? null,
     leistungsdaten: (entry.leistungsdaten ?? []).map((l: any) => ({
       id: l.id,
       fachID: l.fachID,

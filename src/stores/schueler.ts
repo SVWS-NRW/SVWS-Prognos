@@ -2,7 +2,7 @@ import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import type { Schueler, Klasse } from '@/models/Schueler'
 import type { SvwsSchuelerListeEintrag, SvwsKlasse } from '@/models/Schueler'
-import { loadSchuelerAuswahlliste } from '@/services/svwsService'
+import { loadSchuelerAuswahlliste, loadSvwsLernabschnittsdaten } from '@/services/svwsService'
 
 export const useSchuelerStore = defineStore('schueler', () => {
   const klassen = ref<Klasse[]>([])
@@ -10,6 +10,7 @@ export const useSchuelerStore = defineStore('schueler', () => {
   const ausgewaehltId = ref<number | null>(null)
   const laedt = ref(false)
   const fehler = ref<string | null>(null)
+  const abschlussLaedt = ref(false)
 
   const ausgewaehlt = computed(() =>
     schueler.value.find(s => s.id === ausgewaehltId.value) ?? null
@@ -53,6 +54,32 @@ export const useSchuelerStore = defineStore('schueler', () => {
     ausgewaehltId.value = id
   }
 
+  async function ladeAbschlussDaten(abschnittId: number): Promise<void> {
+    abschlussLaedt.value = true
+    const liste = [...schueler.value]
+    const BATCH = 10
+    for (let i = 0; i < liste.length; i += BATCH) {
+      await Promise.all(
+        liste.slice(i, i + BATCH).map(async s => {
+          try {
+            const la = await loadSvwsLernabschnittsdaten(s.id, abschnittId)
+            const idx = schueler.value.findIndex(x => x.id === s.id)
+            if (idx >= 0) {
+              schueler.value[idx] = {
+                ...schueler.value[idx],
+                svwsAbschluss: la.abschluss,
+                svwsIstAbschlussPrognose: la.istAbschlussPrognose,
+              }
+            }
+          } catch {
+            // Einzelfehler ignorieren
+          }
+        })
+      )
+    }
+    abschlussLaedt.value = false
+  }
+
   function clear(): void {
     klassen.value = []
     schueler.value = []
@@ -61,8 +88,8 @@ export const useSchuelerStore = defineStore('schueler', () => {
   }
 
   return {
-    klassen, schueler, ausgewaehltId, ausgewaehlt, laedt, fehler,
-    loadFuerAbschnitt, setKlassen, setSchueler, waehleSchueler, clear,
+    klassen, schueler, ausgewaehltId, ausgewaehlt, laedt, fehler, abschlussLaedt,
+    loadFuerAbschnitt, ladeAbschlussDaten, setKlassen, setSchueler, waehleSchueler, clear,
   }
 })
 

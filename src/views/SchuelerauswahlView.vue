@@ -40,11 +40,36 @@
 
       <div class="table-wrapper">
         <table class="schueler-table">
+          <colgroup>
+            <col :style="{ width: spaltenBreiten[0] + 'px' }" />
+            <col :style="{ width: spaltenBreiten[1] + 'px' }" />
+            <col :style="{ width: spaltenBreiten[2] + 'px' }" />
+            <col :style="{ width: spaltenBreiten[3] + 'px' }" />
+            <col :style="{ width: spaltenBreiten[4] + 'px' }" />
+            <col />
+          </colgroup>
           <thead>
             <tr>
-              <th>Nachname</th>
-              <th>Vorname</th>
-              <th>Klasse</th>
+              <th>
+                Nachname
+                <div class="col-resize-handle" @mousedown.prevent="startResize($event, 0)" />
+              </th>
+              <th>
+                Vorname
+                <div class="col-resize-handle" @mousedown.prevent="startResize($event, 1)" />
+              </th>
+              <th>
+                Klasse
+                <div class="col-resize-handle" @mousedown.prevent="startResize($event, 2)" />
+              </th>
+              <th>
+                Abschluss
+                <div class="col-resize-handle" @mousedown.prevent="startResize($event, 3)" />
+              </th>
+              <th>
+                ist Prognose
+                <div class="col-resize-handle" @mousedown.prevent="startResize($event, 4)" />
+              </th>
               <th></th>
             </tr>
           </thead>
@@ -58,12 +83,14 @@
               <td class="td-name">{{ s.nachname }}</td>
               <td>{{ s.vorname }}</td>
               <td class="td-klasse">{{ s.klasseKuerzel }}</td>
+              <td class="td-abschluss">{{ formatAbschluss(s) }}</td>
+              <td class="td-prognose">{{ formatPrognose(s) }}</td>
               <td class="td-action">
                 <i class="pi pi-chevron-right action-icon" />
               </td>
             </tr>
             <tr v-if="gefiltert.length === 0">
-              <td colspan="4" class="td-empty">Keine Schüler für diesen Filter gefunden.</td>
+              <td colspan="6" class="td-empty">Keine Schüler für diesen Filter gefunden.</td>
             </tr>
           </tbody>
         </table>
@@ -73,7 +100,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import Select from 'primevue/select'
@@ -94,6 +121,9 @@ const fehler = ref<string | null>(null)
 const selectedKlasseId = ref<number | null>(null)
 const selectedAbschnittId = ref<number | null>(abschnittStore.ausgewaehltId)
 
+// Spaltenbreiten in px: Nachname, Vorname, Klasse, Abschluss, Prog.
+const spaltenBreiten = ref([150, 130, 85, 130, 110])
+
 const abschnittOptionen = computed(() =>
   abschnittStore.abschnitte.map(a => ({ label: a.bezeichnung, value: a.id }))
 )
@@ -111,19 +141,81 @@ const gefiltert = computed(() => {
   return liste.filter(s => s.klasseId === selectedKlasseId.value)
 })
 
+// ---------------------------------------------------------------------------
+// Spalten-Resize
+// ---------------------------------------------------------------------------
+interface ResizeState {
+  colIdx: number
+  startX: number
+  startWidth: number
+}
+
+const resizing = ref<ResizeState | null>(null)
+
+function startResize(event: MouseEvent, colIdx: number) {
+  resizing.value = { colIdx, startX: event.clientX, startWidth: spaltenBreiten.value[colIdx] }
+  document.body.style.userSelect = 'none'
+  document.body.style.cursor = 'col-resize'
+}
+
+function onMouseMove(event: MouseEvent) {
+  if (!resizing.value) return
+  const delta = event.clientX - resizing.value.startX
+  spaltenBreiten.value[resizing.value.colIdx] = Math.max(30, resizing.value.startWidth + delta)
+}
+
+function onMouseUp() {
+  if (!resizing.value) return
+  resizing.value = null
+  document.body.style.userSelect = ''
+  document.body.style.cursor = ''
+}
+
 onMounted(async () => {
+  window.addEventListener('mousemove', onMouseMove)
+  window.addEventListener('mouseup', onMouseUp)
+
   laedt.value = true
   fehler.value = null
   try {
     const abschnittId = abschnittStore.ausgewaehltId
     if (!abschnittId) throw new Error('Kein Schuljahresabschnitt verfügbar.')
     await schuelerStore.loadFuerAbschnitt(abschnittId, jg)
+    // Abschlussdaten im Hintergrund nachladen
+    schuelerStore.ladeAbschlussDaten(abschnittId)
   } catch (e: any) {
     fehler.value = e?.message ?? 'Schülerdaten konnten nicht geladen werden.'
   } finally {
     laedt.value = false
   }
 })
+
+onUnmounted(() => {
+  window.removeEventListener('mousemove', onMouseMove)
+  window.removeEventListener('mouseup', onMouseUp)
+})
+
+const ABSCHLUSS_LABEL: Record<string, string> = {
+  'FOR':    'MSA',
+  'FORQ-E': 'MSA/Q',
+  'HA10':   'HA10',
+  'HA':     'HA9',
+  'OA':     'OA',
+  'ESA':    'ESA',
+}
+
+function formatAbschluss(s: { svwsAbschluss?: string | null }): string {
+  if (s.svwsAbschluss === undefined) return '…'
+  if (!s.svwsAbschluss) return '–'
+  const parts = s.svwsAbschluss.split('/')
+  const kuerzel = parts[parts.length - 1] ?? s.svwsAbschluss
+  return ABSCHLUSS_LABEL[kuerzel] ?? kuerzel
+}
+
+function formatPrognose(s: { svwsIstAbschlussPrognose?: boolean | null }): string {
+  if (s.svwsIstAbschlussPrognose === undefined) return '…'
+  return s.svwsIstAbschlussPrognose ? 'P' : '✓'
+}
 
 async function wechsleAbschnitt(id: number) {
   abschnittStore.waehleAbschnitt(id)
@@ -188,15 +280,16 @@ function navigiereZurPrognose(schuelerId: number) {
 
 .table-wrapper {
   flex: 1;
-  overflow-y: auto;
+  overflow: auto;
   border: 1px solid var(--p-content-border-color);
   border-radius: 0.4rem;
 }
 
 .schueler-table {
-  width: 100%;
   border-collapse: collapse;
   font-size: 0.8rem;
+  table-layout: fixed;
+  width: 100%;
 }
 
 .schueler-table th {
@@ -210,12 +303,19 @@ function navigiereZurPrognose(schuelerId: number) {
   top: 0;
   background: var(--p-content-background);
   z-index: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  user-select: none;
 }
 
 .schueler-table td {
+  text-align: left;
   padding: 0.4rem 0.75rem;
   border-bottom: 1px solid var(--p-content-border-color);
   vertical-align: middle;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .schueler-row {
@@ -228,9 +328,11 @@ function navigiereZurPrognose(schuelerId: number) {
   border-bottom: none;
 }
 
-.td-name { font-weight: 500; }
-.td-klasse { color: var(--p-text-muted-color); }
-.td-action { text-align: right; width: 2rem; }
+.td-name      { font-weight: 500; }
+.td-klasse    { color: var(--p-text-muted-color); }
+.td-abschluss { font-weight: 500; }
+.td-prognose  { color: var(--p-text-muted-color); text-align: center; }
+.td-action    { text-align: right; }
 .action-icon { font-size: 0.7rem; color: var(--p-text-muted-color); }
 
 .td-empty {
@@ -238,5 +340,23 @@ function navigiereZurPrognose(schuelerId: number) {
   padding: 1.5rem;
   color: var(--p-text-muted-color);
   font-style: italic;
+}
+
+/* Resize-Handle am rechten Rand der th-Zelle */
+.col-resize-handle {
+  position: absolute;
+  right: 0;
+  top: 20%;
+  bottom: 20%;
+  width: 3px;
+  border-radius: 2px;
+  cursor: col-resize;
+  background: var(--p-content-border-color);
+  opacity: 0.6;
+  transition: opacity 0.15s, background 0.15s;
+}
+.col-resize-handle:hover {
+  background: var(--p-primary-color);
+  opacity: 1;
 }
 </style>
