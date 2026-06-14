@@ -198,6 +198,25 @@
       </div>
 
     </div>
+
+    <!-- Warndialog: Noten geändert -->
+    <Dialog
+      v-model:visible="showNotenWarnung"
+      modal
+      header="Noten wurden geändert"
+      :style="{ width: '26rem' }"
+      :draggable="false"
+    >
+      <p class="noten-warn-text">
+        Sie haben Noten geändert. Diese Änderungen werden dauerhaft in den SVWS-Server übernommen.
+        Möchten Sie die geänderten Noten speichern oder verwerfen?
+      </p>
+      <template #footer>
+        <Button label="Abbrechen" text size="small" @click="showNotenWarnung = false" />
+        <Button label="Verwerfen" outlined size="small" severity="danger" @click="verwerfenNoten" />
+        <Button label="Speichern" size="small" severity="success" :loading="speichert" @click="bestaetigenUndSpeichern" />
+      </template>
+    </Dialog>
   </div>
 </template>
 
@@ -210,6 +229,7 @@ import SelectButton from 'primevue/selectbutton'
 import InputText from 'primevue/inputtext'
 import Checkbox from 'primevue/checkbox'
 import Message from 'primevue/message'
+import Dialog from 'primevue/dialog'
 import ThemeToggle from '@/components/ThemeToggle.vue'
 import { berechnePrognose } from '@/rules'
 import type { AbschlussTyp } from '@/models/PrognoseErgebnis'
@@ -266,6 +286,7 @@ const selectedPO = ref<string | null>('APO-SI20')
 const istAbschlussPrognose = ref(true)
 const speichert = ref(false)
 const speichernFehler = ref<string | null>(null)
+const showNotenWarnung = ref(false)
 
 const SCHULFORM_KUERZEL: Record<string, string> = {
   GESAMTSCHULE: 'GE', SEKUNDARSCHULE: 'SK', PRIMUSSCHULE: 'PR',
@@ -312,11 +333,7 @@ const poOptionen = computed(() => {
 })
 
 
-const hasChanges = computed(() => {
-  const la = rawLernabschnitt.value
-  if (!la) return false
-  if (selectedPO.value !== la.pruefungsOrdnung) return true
-  if (istAbschlussPrognose.value !== (la.istAbschlussPrognose ?? !istAbschlussPrognose.value)) return true
+const notenGeaendert = computed(() => {
   for (let i = 0; i < rohFaecher.value.length; i++) {
     const rohF = rohFaecher.value[i]
     const currentFach = faecher.value[i]
@@ -325,6 +342,14 @@ const hasChanges = computed(() => {
     if (currentFach.note !== orig) return true
   }
   return false
+})
+
+const hasChanges = computed(() => {
+  const la = rawLernabschnitt.value
+  if (!la) return false
+  if (selectedPO.value !== la.pruefungsOrdnung) return true
+  if (istAbschlussPrognose.value !== (la.istAbschlussPrognose ?? !istAbschlussPrognose.value)) return true
+  return notenGeaendert.value
 })
 
 const abschnittOptionen = computed(() =>
@@ -483,6 +508,30 @@ async function laden(abschnittIdParam?: number) {
 }
 
 async function speichern() {
+  if (notenGeaendert.value) {
+    showNotenWarnung.value = true
+    return
+  }
+  await doSpeichern()
+}
+
+async function bestaetigenUndSpeichern() {
+  showNotenWarnung.value = false
+  await doSpeichern()
+}
+
+function verwerfenNoten() {
+  faecher.value = rohFaecher.value.map(f => ({
+    kuerzel: f.kuerzel,
+    bezeichnung: f.bezeichnung,
+    note: notenModus.value === 'quartal' ? f.noteQuartal : f.noteHalbjahr,
+    kursart: f.kursart,
+    istFremdsprache: f.istFremdsprache,
+  }))
+  showNotenWarnung.value = false
+}
+
+async function doSpeichern() {
   if (!rawLernabschnitt.value) return
   speichert.value = true
   speichernFehler.value = null
@@ -504,11 +553,11 @@ async function speichern() {
       if (!rawLd) continue
       const noteField = notenModus.value === 'quartal' ? 'noteQuartal' : 'note'
       const noteStr = currentFach.note !== null ? String(currentFach.note) : null
-      const body = Object.fromEntries(
+      const patchBody = Object.fromEntries(
         Object.entries({ ...rawLd, [noteField]: noteStr } as Record<string, unknown>)
           .filter(([, v]) => v !== null)
       )
-      await patchLeistungsdaten(rawLd.id, body)
+      await patchLeistungsdaten(rawLd.id, patchBody)
     }
 
     await laden()
@@ -745,4 +794,11 @@ function mapKursart(k: string | null): 'E' | 'G' | 'Sonstige' {
 .po-select      { width: 14rem; }
 .abschluss-select { width: 8rem; }
 .speichern-fehler { font-size: 0.72rem; color: #b91c1c; margin-left: auto; }
+
+.noten-warn-text {
+  font-size: 0.85rem;
+  margin: 0;
+  line-height: 1.5;
+  color: var(--p-text-color);
+}
 </style>
