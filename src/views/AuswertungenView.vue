@@ -97,49 +97,49 @@
               <i class="pi pi-check-circle status-ok" />
               Keine Risikofälle gefunden.
             </div>
-            <div v-else class="table-wrapper">
-              <table class="auswertung-table table-fixed">
-                <colgroup>
-                  <col :style="{ width: spaltenBreitenRisiko[0] + 'px' }" />
-                  <col :style="{ width: spaltenBreitenRisiko[1] + 'px' }" />
-                  <col :style="{ width: spaltenBreitenRisiko[2] + 'px' }" />
-                  <col :style="{ width: spaltenBreitenRisiko[3] + 'px' }" />
-                  <col :style="{ width: spaltenBreitenRisiko[4] + 'px' }" />
-                  <col />
-                </colgroup>
-                <thead>
-                  <tr>
-                    <th>Nachname<div class="col-resize-handle" @mousedown.prevent="startResize($event, 'risiko', 0)" /></th>
-                    <th>Vorname<div class="col-resize-handle" @mousedown.prevent="startResize($event, 'risiko', 1)" /></th>
-                    <th>Klasse<div class="col-resize-handle" @mousedown.prevent="startResize($event, 'risiko', 2)" /></th>
-                    <th>Jg.<div class="col-resize-handle" @mousedown.prevent="startResize($event, 'risiko', 3)" /></th>
-                    <th>Abschluss<div class="col-resize-handle" @mousedown.prevent="startResize($event, 'risiko', 4)" /></th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr
-                    v-for="s in risikofaelle"
-                    :key="s.id"
-                    class="schueler-row"
-                    @click="navigiereZurPrognose(s.id)"
-                  >
-                    <td class="td-name">{{ s.nachname }}</td>
-                    <td>{{ s.vorname }}</td>
-                    <td class="td-muted">{{ s.klasseKuerzel }}</td>
-                    <td class="td-muted">{{ s.jahrgang }}</td>
-                    <td>
-                      <Tag
-                        :value="formatAbschluss(s.svwsAbschluss)"
-                        :severity="abschlussZuSeverity(s.svwsAbschluss)"
-                        size="small"
-                      />
-                    </td>
-                    <td class="td-action"><i class="pi pi-chevron-right action-icon" /></td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+            <template v-else>
+              <div class="tbl-head">
+                <span class="sh-cell" :style="{ width: spaltenBreitenRisiko[0] + 'px' }">Nachname<div class="col-resize-handle" @mousedown.prevent="startResize($event, 'risiko', 0)" /></span>
+                <span class="sh-cell" :style="{ width: spaltenBreitenRisiko[1] + 'px' }">Vorname<div class="col-resize-handle" @mousedown.prevent="startResize($event, 'risiko', 1)" /></span>
+                <span class="sh-cell" :style="{ width: spaltenBreitenRisiko[2] + 'px' }">Klasse<div class="col-resize-handle" @mousedown.prevent="startResize($event, 'risiko', 2)" /></span>
+                <span class="sh-cell" :style="{ width: spaltenBreitenRisiko[3] + 'px' }">Jg.<div class="col-resize-handle" @mousedown.prevent="startResize($event, 'risiko', 3)" /></span>
+                <span class="sh-cell" :style="{ width: spaltenBreitenRisiko[4] + 'px' }">Abschluss<div class="col-resize-handle" @mousedown.prevent="startResize($event, 'risiko', 4)" /></span>
+                <span class="sh-cell sh-cell--fill"></span>
+              </div>
+              <div class="tbl-scroll">
+                <table class="auswertung-table table-fixed">
+                  <colgroup>
+                    <col :style="{ width: spaltenBreitenRisiko[0] + 'px' }" />
+                    <col :style="{ width: spaltenBreitenRisiko[1] + 'px' }" />
+                    <col :style="{ width: spaltenBreitenRisiko[2] + 'px' }" />
+                    <col :style="{ width: spaltenBreitenRisiko[3] + 'px' }" />
+                    <col :style="{ width: spaltenBreitenRisiko[4] + 'px' }" />
+                    <col />
+                  </colgroup>
+                  <tbody>
+                    <tr
+                      v-for="s in risikofaelle"
+                      :key="s.id"
+                      class="schueler-row"
+                      @click="navigiereZurPrognose(s.id)"
+                    >
+                      <td class="td-name">{{ s.nachname }}</td>
+                      <td>{{ s.vorname }}</td>
+                      <td class="td-muted">{{ s.klasseKuerzel }}</td>
+                      <td class="td-muted">{{ s.jahrgang }}</td>
+                      <td>
+                        <Tag
+                          :value="formatAbschluss(s.svwsAbschluss)"
+                          :severity="abschlussZuSeverity(s.svwsAbschluss)"
+                          size="small"
+                        />
+                      </td>
+                      <td class="td-action"><i class="pi pi-chevron-right action-icon" /></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </template>
           </TabPanel>
 
           <!-- Tab 3: Offene Prognosen -->
@@ -152,40 +152,40 @@
               <i class="pi pi-check-circle status-ok" />
               Für alle Schüler sind Prognosen gespeichert.
             </div>
-            <div v-else class="table-wrapper">
-              <table class="auswertung-table table-fixed">
-                <colgroup>
-                  <col :style="{ width: spaltenBreitenOffen[0] + 'px' }" />
-                  <col :style="{ width: spaltenBreitenOffen[1] + 'px' }" />
-                  <col :style="{ width: spaltenBreitenOffen[2] + 'px' }" />
-                  <col :style="{ width: spaltenBreitenOffen[3] + 'px' }" />
-                  <col />
-                </colgroup>
-                <thead>
-                  <tr>
-                    <th>Nachname<div class="col-resize-handle" @mousedown.prevent="startResize($event, 'offen', 0)" /></th>
-                    <th>Vorname<div class="col-resize-handle" @mousedown.prevent="startResize($event, 'offen', 1)" /></th>
-                    <th>Klasse<div class="col-resize-handle" @mousedown.prevent="startResize($event, 'offen', 2)" /></th>
-                    <th>Jg.<div class="col-resize-handle" @mousedown.prevent="startResize($event, 'offen', 3)" /></th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr
-                    v-for="s in offenePrognosen"
-                    :key="s.id"
-                    class="schueler-row"
-                    @click="navigiereZurPrognose(s.id)"
-                  >
-                    <td class="td-name">{{ s.nachname }}</td>
-                    <td>{{ s.vorname }}</td>
-                    <td class="td-muted">{{ s.klasseKuerzel }}</td>
-                    <td class="td-muted">{{ s.jahrgang }}</td>
-                    <td class="td-action"><i class="pi pi-chevron-right action-icon" /></td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+            <template v-else>
+              <div class="tbl-head">
+                <span class="sh-cell" :style="{ width: spaltenBreitenOffen[0] + 'px' }">Nachname<div class="col-resize-handle" @mousedown.prevent="startResize($event, 'offen', 0)" /></span>
+                <span class="sh-cell" :style="{ width: spaltenBreitenOffen[1] + 'px' }">Vorname<div class="col-resize-handle" @mousedown.prevent="startResize($event, 'offen', 1)" /></span>
+                <span class="sh-cell" :style="{ width: spaltenBreitenOffen[2] + 'px' }">Klasse<div class="col-resize-handle" @mousedown.prevent="startResize($event, 'offen', 2)" /></span>
+                <span class="sh-cell" :style="{ width: spaltenBreitenOffen[3] + 'px' }">Jg.<div class="col-resize-handle" @mousedown.prevent="startResize($event, 'offen', 3)" /></span>
+                <span class="sh-cell sh-cell--fill"></span>
+              </div>
+              <div class="tbl-scroll">
+                <table class="auswertung-table table-fixed">
+                  <colgroup>
+                    <col :style="{ width: spaltenBreitenOffen[0] + 'px' }" />
+                    <col :style="{ width: spaltenBreitenOffen[1] + 'px' }" />
+                    <col :style="{ width: spaltenBreitenOffen[2] + 'px' }" />
+                    <col :style="{ width: spaltenBreitenOffen[3] + 'px' }" />
+                    <col />
+                  </colgroup>
+                  <tbody>
+                    <tr
+                      v-for="s in offenePrognosen"
+                      :key="s.id"
+                      class="schueler-row"
+                      @click="navigiereZurPrognose(s.id)"
+                    >
+                      <td class="td-name">{{ s.nachname }}</td>
+                      <td>{{ s.vorname }}</td>
+                      <td class="td-muted">{{ s.klasseKuerzel }}</td>
+                      <td class="td-muted">{{ s.jahrgang }}</td>
+                      <td class="td-action"><i class="pi pi-chevron-right action-icon" /></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </template>
           </TabPanel>
 
         </TabPanels>
@@ -442,37 +442,49 @@ onUnmounted(() => {
 }
 .status-ok { color: var(--p-green-500); }
 
-/* Tabs: flex-Kette damit table-wrapper scrollen kann */
+/* Grid statt Flex: tablist bekommt auto-Höhe, panel-Bereich 1fr */
 .auswertungen-tabs {
   flex: 1;
   min-height: 0;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: auto 1fr;
 }
 
 :deep(.p-tabpanels) {
-  flex: 1;
   min-height: 0;
   padding: 0.75rem 0 0;
-}
-
-.tab-panel-body {
-  height: 100%;
   display: flex;
   flex-direction: column;
+  background: transparent;
+}
+
+:deep(.p-tabpanel) {
+  background: transparent;
+  padding: 0;
+}
+
+/* Wie .table-wrapper in SchuelerauswahlView: flex-item der übergeordneten flex-Liste,
+   selbst der Scroll-Container. Sticky-Elemente darin bleiben am oberen Rand stehen. */
+.tab-panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
 }
 
 /* Scrollbare Tabellen-Wrapper */
 .table-wrapper {
   flex: 1;
+  min-height: 0;
   overflow: auto;
   border: 1px solid var(--p-content-border-color);
   border-radius: 0.4rem;
+  background: var(--bg-b);
 }
 
 /* Tabellen-Grundstil */
 .auswertung-table {
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: 0.8rem;
   width: 100%;
 }
@@ -533,7 +545,7 @@ onUnmounted(() => {
 .td-name { font-weight: 500; }
 .td-klasse { color: var(--p-text-muted-color); }
 .td-muted { color: var(--p-text-muted-color); }
-.td-action { text-align: right; }
+.td-action { text-align: left; }
 .action-icon { font-size: 0.7rem; color: var(--p-text-muted-color); }
 
 .td-empty {
@@ -547,14 +559,45 @@ onUnmounted(() => {
 .table-fixed {
   table-layout: fixed;
 }
-.table-fixed th {
-  user-select: none;
-  overflow: hidden;
-}
 .table-fixed td {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Sticky-Header direkt im Scroll-Container (.tab-panel-body) — analog zu <th> in SchuelerauswahlView */
+.tbl-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  background: var(--p-content-background);
+  border: 1px solid var(--p-content-border-color);
+  border-radius: 0.4rem 0.4rem 0 0;
+}
+
+.tbl-scroll {
+  border-left: 1px solid var(--p-content-border-color);
+  border-right: 1px solid var(--p-content-border-color);
+  border-bottom: 1px solid var(--p-content-border-color);
+  border-radius: 0 0 0.4rem 0.4rem;
+  background: var(--bg-b);
+}
+
+.sh-cell {
+  flex-shrink: 0;
+  position: relative;
+  padding: 0.3rem 0.75rem;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--p-text-muted-color);
+  white-space: nowrap;
+  overflow: hidden;
+  user-select: none;
+}
+
+.sh-cell--fill {
+  flex: 1;
 }
 
 .col-resize-handle {

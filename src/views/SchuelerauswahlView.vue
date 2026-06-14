@@ -299,13 +299,15 @@ function navigiereZurPrognose(schuelerId: number) {
 
 .table-wrapper {
   flex: 1;
+  min-height: 0;
   overflow: auto;
   border: 1px solid var(--p-content-border-color);
   border-radius: 0.4rem;
 }
 
 .schueler-table {
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: 0.8rem;
   table-layout: fixed;
   width: 100%;
