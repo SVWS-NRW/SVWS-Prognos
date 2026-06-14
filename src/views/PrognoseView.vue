@@ -315,7 +315,7 @@ const poOptionen = computed(() => {
 const hasChanges = computed(() => {
   const la = rawLernabschnitt.value
   if (!la) return false
-  // Abschluss-Speicherung noch nicht implementiert — nur istAbschlussPrognose und Noten prüfen
+  if (selectedPO.value !== la.pruefungsOrdnung) return true
   if (istAbschlussPrognose.value !== (la.istAbschlussPrognose ?? !istAbschlussPrognose.value)) return true
   for (let i = 0; i < rohFaecher.value.length; i++) {
     const rohF = rohFaecher.value[i]
@@ -399,7 +399,6 @@ watch(schuelerId, () => laden())
 
 onMounted(() => {
   laden()
-  loadPruefungsordnungen().then(pos => { pruefungsordnungen.value = pos })
 })
 
 async function laden(abschnittIdParam?: number) {
@@ -413,28 +412,31 @@ async function laden(abschnittIdParam?: number) {
 
     await faecherStore.ensureLoaded()
 
-    const lernabschnitt = await loadSvwsLernabschnittsdaten(schuelerId.value, abschnittId)
+    const [lernabschnitt] = await Promise.all([
+      loadSvwsLernabschnittsdaten(schuelerId.value, abschnittId),
+      pruefungsordnungen.value.length === 0
+        ? loadPruefungsordnungen().then(pos => { pruefungsordnungen.value = pos })
+        : Promise.resolve(),
+    ])
     rawLernabschnitt.value = lernabschnitt
 
     const schueler = schuelerStore.schueler.find(s => s.id === schuelerId.value)
     jahrgang.value = schueler?.jahrgang ?? null
 
-    // Prüfungsordnung aus gespeichertem Abschluss-String ableiten
-    // "GE/APO-SI20/MSA-Q" → passenden PO-Eintrag "GE/APO-SI20/5-10" suchen
+    // Prüfungsordnung: APO-SI20 als Default; gespeicherten Wert nur übernehmen wenn
+    // er einer bekannten Option entspricht (verhindert leeres Dropdown bei alten Formaten)
     {
       const sfKuerzel = SCHULFORM_KUERZEL[schulform.value] ?? 'GE'
-      if (lernabschnitt.abschluss) {
-        const base = lernabschnitt.abschluss.split('/').slice(0, 2).join('/')
-        const match = pruefungsordnungen.value.find(po =>
-          po.pruefungsOrdnung.split('/').slice(0, 2).join('/') === base
-        )
-        selectedPO.value = match?.pruefungsOrdnung ?? null
-      } else {
-        const match = pruefungsordnungen.value.find(po =>
-          po.pruefungsOrdnung.startsWith(`${sfKuerzel}/APO-SI20/`)
-        )
-        selectedPO.value = match?.pruefungsOrdnung ?? `${sfKuerzel}/APO-SI20/5-10`
-      }
+      const apoOption = pruefungsordnungen.value.find(po =>
+        po.pruefungsOrdnung.startsWith(`${sfKuerzel}/APO-SI20/`)
+      )?.pruefungsOrdnung ?? `${sfKuerzel}/APO-SI20/5-10`
+
+      const gespeichertePO = lernabschnitt.pruefungsOrdnung
+      const gespeicherteGueltig = !!gespeichertePO && (
+        gespeichertePO === apoOption ||
+        pruefungsordnungen.value.some(po => po.pruefungsOrdnung === gespeichertePO)
+      )
+      selectedPO.value = gespeicherteGueltig ? gespeichertePO : apoOption
     }
 
     // IstAbschlussPrognose: gespeicherten Wert nehmen oder Default berechnen
