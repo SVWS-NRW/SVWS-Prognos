@@ -111,6 +111,32 @@
               </tr>
             </thead>
             <tbody>
+              <tr v-if="lbnwNote !== null">
+                <td>
+                  <InputText model-value="LBNW" size="small" class="w-kuerzel" readonly />
+                </td>
+                <td>
+                  <InputText model-value="Lernbereich Naturwissenschaften" size="small" class="w-bez" readonly />
+                </td>
+                <td :class="{ 'note--rot': lbnwNote >= 5 }">
+                  <Select
+                    :model-value="lbnwNote"
+                    :options="noteOptionen"
+                    option-label="label"
+                    option-value="value"
+                    size="small"
+                    class="w-note"
+                    @update:model-value="v => lbnwNote = v ?? null"
+                  />
+                </td>
+                <td>
+                  <Select model-value="Sonstige" :options="kursartOptionen" size="small" class="w-kursart" disabled />
+                </td>
+                <td class="col-center">
+                  <Checkbox :model-value="false" :binary="true" disabled />
+                </td>
+                <td></td>
+              </tr>
               <tr v-for="(fach, idx) in faecher" :key="idx">
                 <td>
                   <InputText
@@ -333,7 +359,10 @@ const poOptionen = computed(() => {
 })
 
 
+const lbnwNote = ref<number | null>(null)
+
 const notenGeaendert = computed(() => {
+  if (lbnwNote.value !== (rawLernabschnitt.value?.noteLernbereichNW ?? null)) return true
   for (let i = 0; i < rohFaecher.value.length; i++) {
     const rohF = rohFaecher.value[i]
     const currentFach = faecher.value[i]
@@ -399,16 +428,20 @@ function navigiereZuNaechstem() {
 const ergebnis = computed(() => {
   const valid = faecher.value.filter(f => f.kuerzel.trim() !== '' && f.note !== null)
   if (valid.length === 0) return null
+  const eingabe = valid.map(f => ({
+    kuerzel: f.kuerzel,
+    note: f.note as number,
+    kursart: f.kursart,
+    bezeichnung: f.bezeichnung || undefined,
+    istFremdsprache: f.istFremdsprache || undefined,
+  }))
+  if (lbnwNote.value !== null) {
+    eingabe.push({ kuerzel: 'LBNW', note: lbnwNote.value, kursart: 'Sonstige', bezeichnung: undefined, istFremdsprache: undefined })
+  }
   return berechnePrognose({
     jahrgang: jahrgang.value,
     schulform: schulform.value,
-    faecher: valid.map(f => ({
-      kuerzel: f.kuerzel,
-      note: f.note as number,
-      kursart: f.kursart,
-      bezeichnung: f.bezeichnung || undefined,
-      istFremdsprache: f.istFremdsprache || undefined,
-    })),
+    faecher: eingabe,
   })
 })
 
@@ -444,6 +477,7 @@ async function laden(abschnittIdParam?: number) {
         : Promise.resolve(),
     ])
     rawLernabschnitt.value = lernabschnitt
+    lbnwNote.value = lernabschnitt.noteLernbereichNW
 
     const schueler = schuelerStore.schueler.find(s => s.id === schuelerId.value)
     jahrgang.value = schueler?.jahrgang ?? null
@@ -528,6 +562,7 @@ function verwerfenNoten() {
     kursart: f.kursart,
     istFremdsprache: f.istFremdsprache,
   }))
+  lbnwNote.value = rawLernabschnitt.value?.noteLernbereichNW ?? null
   showNotenWarnung.value = false
 }
 
@@ -540,6 +575,9 @@ async function doSpeichern() {
       istAbschlussPrognose: istAbschlussPrognose.value,
     }
     if (selectedPO.value) body.pruefungsOrdnung = selectedPO.value
+    if (lbnwNote.value !== rawLernabschnitt.value.noteLernbereichNW) {
+      body.noteLernbereichNW = lbnwNote.value
+    }
     await patchLernabschnittsdaten(rawLernabschnitt.value.id, body)
 
     // Geänderte Noten speichern
