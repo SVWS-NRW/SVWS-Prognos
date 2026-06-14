@@ -12,6 +12,7 @@
  *
  * Optionen:
  *   --abschnitt <id>   Abweichenden Schuljahresabschnitt verwenden
+ *   --jahrgang <jg>    Nur diesen Jahrgang verarbeiten (z. B. 8); Standard: 8 9 10
  *   --dry-run          Nur anzeigen, was geändert würde (kein Schreiben)
  */
 import https from 'node:https'
@@ -36,10 +37,12 @@ function parseArgs() {
     )
     process.exit(1)
   }
+  const jgArg = get('--jahrgang')
   return {
     url, schema, user, pass,
-    abschnitt: get('--abschnitt') ? Number(get('--abschnitt')) : null,
-    dryRun:    argv.includes('--dry-run'),
+    abschnitt:  get('--abschnitt') ? Number(get('--abschnitt')) : null,
+    jahrgaenge: jgArg ? new Set([jgArg]) : new Set(['8', '9', '10']),
+    dryRun:     argv.includes('--dry-run'),
   }
 }
 
@@ -106,11 +109,10 @@ async function main() {
   console.log(`${klassenlehrerMap.size} Klassen mit Klassenlehrer gefunden`)
 
   // 3. Schülerliste Jg. 8–10
-  const auswahl    = await request('GET', `/schueler/abschnitt/${abschnittId}/auswahlliste`)
-  const alle       = auswahl.schueler ?? []
-  const JAHRGAENGE = new Set(['8', '9', '10'])
-  const schueler   = alle.filter(s => JAHRGAENGE.has(String(parseInt(s.jahrgang, 10))))
-  console.log(`${schueler.length} Schüler in Jg. 8–10 gefunden\n`)
+  const auswahl  = await request('GET', `/schueler/abschnitt/${abschnittId}/auswahlliste`)
+  const alle     = auswahl.schueler ?? []
+  const schueler = alle.filter(s => args.jahrgaenge.has(String(parseInt(s.jahrgang, 10))))
+  console.log(`${schueler.length} Schüler in Jg. ${[...args.jahrgaenge].join('/')} gefunden\n`)
 
   let gesetzt = 0, ohneLehrer = 0, fehler = 0
 
