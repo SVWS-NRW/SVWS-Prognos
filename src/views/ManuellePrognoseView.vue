@@ -168,13 +168,16 @@ function sf(kuerzel: string, bezeichnung: string, kursart: FormFach['kursart'] =
 }
 
 const STANDARD_FAECHER: FormFach[] = [
+  sf('LBNW', 'Lernbereich - Naturwissenschaften'),
   sf('D',    'Deutsch',                                        'G'),
   sf('M',    'Mathematik',                                     'G'),
   sf('E',    'Englisch',                                       'G', true),
   sf('WP1',  'Fach im Wahlpflichtbereich'),
-  sf('LBNW', 'Lernbereich - Naturwissenschaften'),
   sf('CH',   'Chemie',                                         'G'),
+  sf('EK',   'Erdkunde'),
+  sf('GE',   'Geschichte'),
   sf('GL',   'Gesellschaftslehre'),
+  sf('KU',   'Kunst'),
   sf('AT',   'Arbeitslehre - Technik'),
   sf('AW',   'Arbeitslehre - Wirtschaft'),
   sf('AH',   'Arbeitslehre - Hauswirtschaft'),
@@ -182,6 +185,10 @@ const STANDARD_FAECHER: FormFach[] = [
   sf('SP',   'Sport'),
   sf('EGSN', 'Fach im benoteten Ergänzungsstundenbereich', 'Sonstige', true),
 ]
+
+function lernbereicheNachOben(arr: FormFach[]): FormFach[] {
+  return [...arr].sort((a, b) => (a.kuerzel.startsWith('LB') ? 0 : 1) - (b.kuerzel.startsWith('LB') ? 0 : 1))
+}
 
 const jahrgang = ref<string | null>('10')
 const schulform = ref<Schulform>('GESAMTSCHULE')
@@ -242,13 +249,17 @@ function handleImport(event: Event) {
       const json = JSON.parse(e.target!.result as string)
       const src = json.input ?? json
       const roh: unknown[] = Array.isArray(src) ? src : (src.faecher ?? [])
-      faecher.value = roh.map((f: any) => ({
-        kuerzel: String(f.kuerzel ?? '').toUpperCase(),
-        bezeichnung: String(f.bezeichnung ?? ''),
-        note: Number(f.note ?? 3),
-        kursart: (['E', 'G', 'Sonstige'].includes(f.kursart) ? f.kursart : 'Sonstige') as 'E' | 'G' | 'Sonstige',
-        istFremdsprache: Boolean(f.istFremdsprache ?? false),
-      }))
+      faecher.value = lernbereicheNachOben(
+        roh
+          .map((f: any) => ({
+            kuerzel: String(f.kuerzel ?? '').toUpperCase(),
+            bezeichnung: String(f.bezeichnung ?? ''),
+            note: Number(f.note ?? 3),
+            kursart: (['E', 'G', 'Sonstige'].includes(f.kursart) ? f.kursart : 'Sonstige') as 'E' | 'G' | 'Sonstige',
+            istFremdsprache: Boolean(f.istFremdsprache ?? false),
+          }))
+          .filter(f => f.kuerzel !== 'LBAL'),
+      )
       if (src.jahrgang !== undefined) jahrgang.value = src.jahrgang
     } catch { /* ungültige Datei */ }
     input.value = ''
