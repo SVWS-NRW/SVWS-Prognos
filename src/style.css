@@ -54,11 +54,20 @@
   --abschluss-nicht:     #f87171;
 }
 
+/* ── Browser-Zoom (Electron hat festes 1400×900-Fenster, Browser nicht) ────── */
+html.browser {
+  font-size: 80%; /* skaliert alle rem-basierten PrimeVue-Komponenten, vh-Einheiten bleiben unberührt */
+}
+
 /* ── Body ─────────────────────────────────────────────────────────────────── */
 *,
 *::before,
 *::after {
   box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
 }
 
 body {
@@ -68,8 +77,11 @@ body {
     radial-gradient(circle at 10% 20%, rgba(5, 150, 105, 0.10), transparent 38%),
     radial-gradient(circle at 90% 15%, rgba(15, 143, 143, 0.10), transparent 30%),
     linear-gradient(140deg, var(--bg-a), var(--bg-b));
-  min-height: 100vh;
   color: var(--app-ink);
+}
+
+#app {
+  height: 100%;
 }
 
 /* ── Native Spinbuttons ausblenden (ADR 0017) ─────────────────────────────── */

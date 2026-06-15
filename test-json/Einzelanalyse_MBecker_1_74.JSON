@@ -1,0 +1,89 @@
+{
+    "input": {
+        "schuljahr": null,
+        "abschnitt": null,
+        "jahrgang": "10",
+        "apo-s1": "APO-SI20",
+        "faecher": [
+            {"kuerzel":"D","note":3,"kursart":"E","bezeichnung":"Deutsch"},
+            {"kuerzel":"E","note":1,"kursart":"E","bezeichnung":"Englisch","istFremdsprache":true},
+            {"kuerzel":"M","note":5,"kursart":"E","bezeichnung":"Mathematik"},
+            {"kuerzel":"WP1","note":1,"kursart":"Sonstige","bezeichnung":"Fach im Wahlpflichtbereich"},
+            {"kuerzel":"BI","note":2,"kursart":"G","bezeichnung":"Biologie"},
+            {"kuerzel":"CH","note":4,"kursart":"G","bezeichnung":"Chemie"},
+            {"kuerzel":"GL","note":4,"kursart":"Sonstige","bezeichnung":"Gesellschaftslehre"},
+            {"kuerzel":"RePP","note":4,"kursart":"Sonstige","bezeichnung":"Rel./Prak. Philo."},
+            {"kuerzel":"SP","note":4,"kursart":"Sonstige","bezeichnung":"Sport"},
+            {"kuerzel":"MU","note":2,"kursart":"Sonstige","bezeichnung":"Musik"}
+        ]
+    },
+    "Prognose": {
+        "abschluss": "ESA",
+        "npFaecher": ["D","M"],
+        "log": [
+            "Name     : Einzelanalyse, MBecker_1, (Jg:10)",
+            "Prognose : ESA",
+            "Datum    : 21.04.2026 17:25:22",
+            "APOVer   : APO-SI20",
+            " ",
+            "Prüfe ESA:",
+            "=========",
+            "  -ESA, wegen Versetzung in die 10. Klasse.",
+            " Abschluss: ESA gem. APO-SI §40 (3)",
+            " ",
+            "Prüfe EESA:",
+            "==========",
+            "Es sind Fehler bei der Vorprüfung der Noten aufgetreten:",
+            "  -Eine FLD ist nur in einem der Fächer CH oder PH oder BI zulässig!",
+            "  -Lernbereichsnote NW nicht vorhanden",
+            "Fehler: Die Berechnung der Prognose wird abgebrochen ...",
+            " ",
+            "Prüfe MSA:",
+            "=========",
+            "Es sind Fehler bei der Vorprüfung der Noten aufgetreten:",
+            "  -Eine FLD ist nur in einem der Fächer CH oder PH oder BI zulässig!",
+            "Fehler: Die Berechnung der Prognose wird abgebrochen ...",
+            "________________________________________",
+            "Hinweise:",
+            "========",
+            "  -Das Programm befreit nicht von einer auf der geltenden Rechtslage basierenden Entscheidungsfindung!",
+            "  -APOVer:APO-SI20: APO-SI, mit den Regelungen für Abschlüsse/Berechtigungen, die ab 01.08.2020 neu ab Klasse 5 gelten"
+        ]
+    },
+    "ESA": null,
+    "EESA": null,
+    "MSA": {
+        "erworben": false,
+        "abschluss": null,
+        "npFaecher": null,
+        "log": [
+            "Name        : Einzelanalyse, MBecker_1, (Jg:10)",
+            "Überprüfung : MSA",
+            "Datum       : 21.04.2026 17:44:58",
+            "APOVer      : APO-SI20",
+            " ",
+            "Prüfe MSA:",
+            "=========",
+            "Es sind Fehler bei der Vorprüfung der Noten aufgetreten:",
+            "  -==> Prognose: MSA/MSAQ: Eine FLD muss in CH oder PH oder BI stattfinden!",
+            "Fehler: Die Berechnung der Prognose wird abgebrochen ..."
+        ]
+    },
+    "MSA_Q": {
+        "erworben": false,
+        "abschluss": null,
+        "npFaecher": null,
+        "log": [
+            "Name        : Einzelanalyse, MBecker_1, (Jg:10)",
+            "Überprüfung : MSAQ",
+            "Datum       : 21.04.2026 17:44:58",
+            "APOVer      : APO-SI20",
+            " ",
+            "Prüfe MSAQ:",
+            "==========",
+            "Es sind Fehler bei der Vorprüfung der Noten aufgetreten:",
+            "  -==> Prognose: MSA/MSAQ: Eine FLD muss in CH oder PH oder BI stattfinden!",
+            "Fehler: Die Berechnung der Prognose wird abgebrochen ..."
+        ]
+    }
+}

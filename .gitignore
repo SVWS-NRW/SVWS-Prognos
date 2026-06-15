@@ -37,5 +37,3 @@ Thumbs.db
 # Quellcode der alten Delphi-Anwendung (nur zur lokalen Analyse, nicht einchecken)
 delphiSrc/
 
-# Testfälle aus der alten Anwendung (lokale Referenzdaten)
-test-json/

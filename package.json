@@ -1,6 +1,6 @@
 {
   "name": "svws-prognos",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "main": "electron/main.cjs",
@@ -17,6 +17,7 @@
   "build": {
     "appId": "de.skinwalker.svws-prognos",
     "productName": "SVWS Prognos",
+    "artifactName": "SVWS-Prognos-${version}.${ext}",
     "directories": {
       "output": "release"
     },
