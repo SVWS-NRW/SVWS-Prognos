@@ -11,7 +11,7 @@
         @click="router.push({ name: 'jahrgang', params: { jg: jahrgang ?? '' } })"
       />
       <Button icon="pi pi-arrow-left" text size="small" @click="router.back()" />
-      <span class="toolbar-title">{{ schuelerName }}</span>
+      <span class="toolbar-title">{{ schuelerName }}<span v-if="schuelerKlasse" class="toolbar-klasse"> · {{ schuelerKlasse }}</span></span>
       <Button
         v-if="naechsterSchueler"
         icon="pi pi-arrow-right"
@@ -236,7 +236,11 @@
       <p class="noten-warn-text">
         <template v-if="faecherGeloescht">Gelöschte Fächer werden dauerhaft aus dem SVWS-Server entfernt.<br></template>
         <template v-if="notenGeaendert">Geänderte Noten werden dauerhaft in den SVWS-Server übernommen.<br></template>
-        Möchten Sie die Änderungen speichern oder verwerfen?
+        <template v-if="neueFaecherVorhanden">
+          <br><i class="pi pi-info-circle" style="color: var(--p-blue-500)" /> Neu hinzugefügte Fächer können hier nicht gespeichert werden und werden ignoriert. Fächer können nur in der Hauptanwendung (SVWS) angelegt werden.<br>
+        </template>
+        <template v-if="faecherGeloescht || notenGeaendert">Möchten Sie die Änderungen speichern oder verwerfen?</template>
+        <template v-else>Möchten Sie trotzdem fortfahren?</template>
       </p>
       <template #footer>
         <Button label="Abbrechen" text size="small" @click="showNotenWarnung = false" />
@@ -380,12 +384,15 @@ const faecherGeloescht = computed(() => {
   return rohFaecher.value.some(f => !vorhandeneIds.has(f.svwsId))
 })
 
+const neueFaecherVorhanden = computed(() => faecher.value.some(f => f.svwsId === null))
+
 const hasChanges = computed(() => {
   const la = rawLernabschnitt.value
   if (!la) return false
   if (selectedPO.value !== la.pruefungsOrdnung) return true
   if (istAbschlussPrognose.value !== (la.istAbschlussPrognose ?? !istAbschlussPrognose.value)) return true
   if (faecherGeloescht.value) return true
+  if (neueFaecherVorhanden.value) return true
   return notenGeaendert.value
 })
 
@@ -418,7 +425,13 @@ const noteOptionen = [
 
 const schuelerName = computed(() => {
   const s = schuelerStore.schueler.find(s => s.id === schuelerId.value)
-  return s ? `${s.nachname}, ${s.vorname}` : `Schüler #${schuelerId.value}`
+  if (!s) return `Schüler #${schuelerId.value}`
+  return `${s.nachname}, ${s.vorname}`
+})
+
+const schuelerKlasse = computed(() => {
+  const s = schuelerStore.schueler.find(s => s.id === schuelerId.value)
+  return s?.klasseKuerzel ?? null
 })
 
 const naechsterSchueler = computed(() => {
@@ -551,7 +564,7 @@ async function laden(abschnittIdParam?: number) {
 }
 
 async function speichern() {
-  if (notenGeaendert.value || faecherGeloescht.value) {
+  if (notenGeaendert.value || faecherGeloescht.value || neueFaecherVorhanden.value) {
     showNotenWarnung.value = true
     return
   }
@@ -678,6 +691,10 @@ function mapKursart(k: string | null): 'E' | 'G' | 'Sonstige' {
   font-size: 0.9rem;
   font-weight: 600;
   white-space: nowrap;
+}
+.toolbar-klasse {
+  font-weight: 400;
+  color: var(--p-text-muted-color);
 }
 .toolbar-sep  { flex: 1; }
 .btn-naechster :deep(.p-button-icon) { color: #16a34a; }
