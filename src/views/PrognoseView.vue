@@ -468,10 +468,10 @@ const ergebnis = computed(() => {
 
 watch(notenModus, () => {
   if (rohFaecher.value.length === 0) return
-  faecher.value = rohFaecher.value.map(f => ({
+  faecher.value = kernfaecherNachOben(rohFaecher.value.map(f => ({
     ...f,
     note: notenModus.value === 'quartal' ? f.noteQuartal : f.noteHalbjahr,
-  }))
+  })))
 })
 
 watch(schuelerId, () => laden())
@@ -547,14 +547,14 @@ async function laden(abschnittIdParam?: number) {
       })
       .filter((f): f is RohFach => f !== null)
 
-    faecher.value = rohFaecher.value.map(f => ({
+    faecher.value = kernfaecherNachOben(rohFaecher.value.map(f => ({
       kuerzel: f.kuerzel,
       bezeichnung: f.bezeichnung,
       note: notenModus.value === 'quartal' ? f.noteQuartal : f.noteHalbjahr,
       kursart: f.kursart,
       istFremdsprache: f.istFremdsprache,
       svwsId: f.svwsId,
-    }))
+    })))
 
   } catch (e: any) {
     fehler.value = e?.message ?? 'Prognosedaten konnten nicht geladen werden.'
@@ -577,14 +577,14 @@ async function bestaetigenUndSpeichern() {
 }
 
 function verwerfenNoten() {
-  faecher.value = rohFaecher.value.map(f => ({
+  faecher.value = kernfaecherNachOben(rohFaecher.value.map(f => ({
     kuerzel: f.kuerzel,
     bezeichnung: f.bezeichnung,
     note: notenModus.value === 'quartal' ? f.noteQuartal : f.noteHalbjahr,
     kursart: f.kursart,
     istFremdsprache: f.istFremdsprache,
     svwsId: f.svwsId,
-  }))
+  })))
   lbnwNote.value = rawLernabschnitt.value?.noteLernbereichNW ?? null
   showNotenWarnung.value = false
 }
@@ -658,6 +658,19 @@ function abschlussName(a: AbschlussTyp): string {
     MSA_Q: 'MSA mit Qualifikationsvermerk',
   }
   return n[a]
+}
+
+const KERNFACH_REIHENFOLGE = ['D', 'M', 'E']
+
+function kernfaecherNachOben<T extends { kuerzel: string }>(arr: T[]): T[] {
+  return [...arr].sort((a, b) => {
+    const ia = KERNFACH_REIHENFOLGE.indexOf(a.kuerzel)
+    const ib = KERNFACH_REIHENFOLGE.indexOf(b.kuerzel)
+    if (ia !== -1 && ib !== -1) return ia - ib
+    if (ia !== -1) return -1
+    if (ib !== -1) return 1
+    return 0
+  })
 }
 
 function normKuerzel(kuerzel: string): string {
