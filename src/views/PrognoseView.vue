@@ -229,13 +229,14 @@
     <Dialog
       v-model:visible="showNotenWarnung"
       modal
-      header="Noten wurden geändert"
+      :header="faecherGeloescht && !notenGeaendert ? 'Fach wird gelöscht' : 'Änderungen speichern'"
       :style="{ width: '26rem' }"
       :draggable="false"
     >
       <p class="noten-warn-text">
-        Sie haben Noten geändert. Diese Änderungen werden dauerhaft in den SVWS-Server übernommen.
-        Möchten Sie die geänderten Noten speichern oder verwerfen?
+        <template v-if="faecherGeloescht">Gelöschte Fächer werden dauerhaft aus dem SVWS-Server entfernt.<br></template>
+        <template v-if="notenGeaendert">Geänderte Noten werden dauerhaft in den SVWS-Server übernommen.<br></template>
+        Möchten Sie die Änderungen speichern oder verwerfen?
       </p>
       <template #footer>
         <Button label="Abbrechen" text size="small" @click="showNotenWarnung = false" />
@@ -269,6 +270,7 @@ import {
   loadPruefungsordnungen,
   patchLernabschnittsdaten,
   patchLeistungsdaten,
+  deleteLeistungsdaten,
   parseNoteString,
 } from '@/services/svwsService'
 import type { SvwsPruefungsordnung } from '@/services/svwsService'
@@ -289,6 +291,7 @@ interface FormFach {
   note: number | null
   kursart: 'E' | 'G' | 'Sonstige'
   istFremdsprache: boolean
+  svwsId: number | null
 }
 
 interface RohFach extends FormFach {
@@ -363,9 +366,8 @@ const lbnwNote = ref<number | null>(null)
 
 const notenGeaendert = computed(() => {
   if (lbnwNote.value !== (rawLernabschnitt.value?.noteLernbereichNW ?? null)) return true
-  for (let i = 0; i < rohFaecher.value.length; i++) {
-    const rohF = rohFaecher.value[i]
-    const currentFach = faecher.value[i]
+  for (const rohF of rohFaecher.value) {
+    const currentFach = faecher.value.find(f => f.svwsId === rohF.svwsId)
     if (!currentFach) continue
     const orig = notenModus.value === 'quartal' ? rohF.noteQuartal : rohF.noteHalbjahr
     if (currentFach.note !== orig) return true
@@ -373,11 +375,17 @@ const notenGeaendert = computed(() => {
   return false
 })
 
+const faecherGeloescht = computed(() => {
+  const vorhandeneIds = new Set(faecher.value.map(f => f.svwsId).filter((id): id is number => id !== null))
+  return rohFaecher.value.some(f => !vorhandeneIds.has(f.svwsId))
+})
+
 const hasChanges = computed(() => {
   const la = rawLernabschnitt.value
   if (!la) return false
   if (selectedPO.value !== la.pruefungsOrdnung) return true
   if (istAbschlussPrognose.value !== (la.istAbschlussPrognose ?? !istAbschlussPrognose.value)) return true
+  if (faecherGeloescht.value) return true
   return notenGeaendert.value
 })
 
@@ -532,6 +540,7 @@ async function laden(abschnittIdParam?: number) {
       note: notenModus.value === 'quartal' ? f.noteQuartal : f.noteHalbjahr,
       kursart: f.kursart,
       istFremdsprache: f.istFremdsprache,
+      svwsId: f.svwsId,
     }))
 
   } catch (e: any) {
@@ -542,7 +551,7 @@ async function laden(abschnittIdParam?: number) {
 }
 
 async function speichern() {
-  if (notenGeaendert.value) {
+  if (notenGeaendert.value || faecherGeloescht.value) {
     showNotenWarnung.value = true
     return
   }
@@ -561,6 +570,7 @@ function verwerfenNoten() {
     note: notenModus.value === 'quartal' ? f.noteQuartal : f.noteHalbjahr,
     kursart: f.kursart,
     istFremdsprache: f.istFremdsprache,
+    svwsId: f.svwsId,
   }))
   lbnwNote.value = rawLernabschnitt.value?.noteLernbereichNW ?? null
   showNotenWarnung.value = false
@@ -580,10 +590,17 @@ async function doSpeichern() {
     }
     await patchLernabschnittsdaten(rawLernabschnitt.value.id, body)
 
-    // Geänderte Noten speichern
-    for (let i = 0; i < rohFaecher.value.length; i++) {
-      const rohF = rohFaecher.value[i]
-      const currentFach = faecher.value[i]
+    // Gelöschte Fächer vom Server entfernen
+    const vorhandeneIds = new Set(faecher.value.map(f => f.svwsId).filter((id): id is number => id !== null))
+    for (const rohF of rohFaecher.value) {
+      if (!vorhandeneIds.has(rohF.svwsId)) {
+        await deleteLeistungsdaten(rohF.svwsId)
+      }
+    }
+
+    // Geänderte Noten speichern (svwsId-basiert, kein Index-Versatz)
+    for (const rohF of rohFaecher.value) {
+      const currentFach = faecher.value.find(f => f.svwsId === rohF.svwsId)
       if (!currentFach) continue
       const originalNote = notenModus.value === 'quartal' ? rohF.noteQuartal : rohF.noteHalbjahr
       if (currentFach.note === originalNote) continue
@@ -607,7 +624,7 @@ async function doSpeichern() {
 }
 
 function addFach() {
-  faecher.value.push({ kuerzel: '', bezeichnung: '', note: null, kursart: 'Sonstige', istFremdsprache: false })
+  faecher.value.push({ kuerzel: '', bezeichnung: '', note: null, kursart: 'Sonstige', istFremdsprache: false, svwsId: null })
 }
 
 function protokollClass(line: string): string {

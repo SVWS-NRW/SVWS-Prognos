@@ -149,6 +149,10 @@ export async function patchLeistungsdaten(
   await getApiClient().patch(`/schueler/leistungsdaten/${id}`, body)
 }
 
+export async function deleteLeistungsdaten(id: number): Promise<void> {
+  await getApiClient().delete(`/schueler/leistungsdaten/${id}`)
+}
+
 export function parseNoteString(noteStr: string | null | undefined): number | null {
   if (!noteStr) return null
   const ersteZiffer = parseInt(noteStr.trim()[0], 10)
