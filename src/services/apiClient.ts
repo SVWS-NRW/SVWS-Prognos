@@ -15,21 +15,22 @@ export function createApiClient(
 ): void {
   const auth = buildAuthHeader(username, password)
   const isElectron = typeof window !== 'undefined' && 'process' in window
+  const useProxy = !isElectron && import.meta.env.DEV
 
-  const resolvedBase = isElectron
-    ? `${baseUrl}/db/${schema}`
-    : `/svws-proxy/db/${schema}`
+  const resolvedBase = useProxy
+    ? `/svws-proxy/db/${schema}`
+    : `${baseUrl}/db/${schema}`
 
-  const resolvedRoot = isElectron
-    ? baseUrl
-    : '/svws-proxy'
+  const resolvedRoot = useProxy
+    ? '/svws-proxy'
+    : baseUrl
 
   const headers: Record<string, string> = {
     Authorization: auth,
     'Content-Type': 'application/json',
   }
 
-  if (!isElectron) {
+  if (useProxy) {
     headers['X-Proxy-Target'] = baseUrl
   }
 

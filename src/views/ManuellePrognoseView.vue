@@ -147,10 +147,10 @@ import Button from 'primevue/button'
 import Select from 'primevue/select'
 import InputText from 'primevue/inputtext'
 import Checkbox from 'primevue/checkbox'
-import ThemeToggle from '@/components/ThemeToggle.vue'
 import { berechnePrognose } from '@/rules'
 import type { AbschlussTyp } from '@/models/PrognoseErgebnis'
 import type { Schulform } from '@/rules/types'
+import ThemeToggle from '@/components/ThemeToggle.vue'
 
 const router = useRouter()
 const fileInput = ref<HTMLInputElement | null>(null)

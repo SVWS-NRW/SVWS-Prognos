@@ -117,5 +117,6 @@ function mapSchueler(klassen: SvwsKlasse[]) {
     klasseId: s.idKlasse,
     klasseKuerzel: klassenMap.get(s.idKlasse)?.kuerzel ?? '',
     schuljahresabschnittId: 0,
+    status: s.status,
   })
 }

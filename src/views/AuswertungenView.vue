@@ -206,9 +206,9 @@ import Tab from 'primevue/tab'
 import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 import Tag from 'primevue/tag'
-import ThemeToggle from '@/components/ThemeToggle.vue'
 import { useSchuelerStore } from '@/stores/schueler'
 import { useSchuljahresabschnittStore } from '@/stores/schuljahresabschnitt'
+import ThemeToggle from '@/components/ThemeToggle.vue'
 
 const router = useRouter()
 const schuelerStore = useSchuelerStore()
