@@ -33,9 +33,9 @@ const title = computed(() => ({
   width: 2rem;
   height: 2rem;
   border-radius: 50%;
-  border: 1px solid var(--p-content-border-color);
+  border: 1px solid var(--app-border);
   background: transparent;
-  color: var(--p-text-muted-color);
+  color: var(--app-ink);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -45,7 +45,7 @@ const title = computed(() => ({
   transition: color 0.15s, border-color 0.15s;
 }
 .theme-btn:hover {
-  color: var(--p-primary-color);
-  border-color: var(--p-primary-color);
+  color: var(--accent);
+  border-color: var(--accent);
 }
 </style>

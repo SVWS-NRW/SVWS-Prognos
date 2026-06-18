@@ -261,7 +261,6 @@ import InputText from 'primevue/inputtext'
 import Checkbox from 'primevue/checkbox'
 import Message from 'primevue/message'
 import Dialog from 'primevue/dialog'
-import ThemeToggle from '@/components/ThemeToggle.vue'
 import { berechnePrognose } from '@/rules'
 import type { AbschlussTyp } from '@/models/PrognoseErgebnis'
 import type { Schulform } from '@/rules/types'
@@ -279,6 +278,7 @@ import {
 } from '@/services/svwsService'
 import type { SvwsPruefungsordnung } from '@/services/svwsService'
 import type { SvwsLernabschnittsdaten } from '@/models/Lernabschnitt'
+import ThemeToggle from '@/components/ThemeToggle.vue'
 
 const route = useRoute()
 const router = useRouter()

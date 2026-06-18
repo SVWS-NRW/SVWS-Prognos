@@ -14,6 +14,14 @@
         @update:model-value="wechsleAbschnitt"
       />
       <Select
+        v-model="selectedStatus"
+        :options="statusOptionen"
+        option-label="label"
+        option-value="value"
+        size="small"
+        class="status-select"
+      />
+      <Select
         v-model="selectedKlasseId"
         :options="klassenOptionen"
         option-label="label"
@@ -111,9 +119,9 @@ import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import Select from 'primevue/select'
 import Message from 'primevue/message'
-import ThemeToggle from '@/components/ThemeToggle.vue'
 import { useSchuelerStore } from '@/stores/schueler'
 import { useSchuljahresabschnittStore } from '@/stores/schuljahresabschnitt'
+import ThemeToggle from '@/components/ThemeToggle.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -126,6 +134,7 @@ const laedt = ref(false)
 const fehler = ref<string | null>(null)
 const selectedKlasseId = ref<number | null>(null)
 const selectedAbschnittId = ref<number | null>(abschnittStore.ausgewaehltId)
+const selectedStatus = ref<number | null>(2)
 
 // Spaltenbreiten in px: Nachname, Vorname, Klasse, Abschluss, Prüfungsordnung, ist Prognose
 const spaltenBreiten = ref([150, 130, 85, 100, 140, 110])
@@ -133,6 +142,18 @@ const spaltenBreiten = ref([150, 130, 85, 100, 140, 110])
 const abschnittOptionen = computed(() =>
   abschnittStore.abschnitte.map(a => ({ label: a.bezeichnung, value: a.id }))
 )
+
+const statusOptionen = [
+  { label: 'Alle',                   value: null },
+  { label: 'Aufnahme',               value: 0 },
+  { label: 'Warteliste',             value: 1 },
+  { label: 'Aktiv',                  value: 2 },
+  { label: 'Beurlaubt',              value: 3 },
+  { label: 'Extern',                 value: 6 },
+  { label: 'Abschluss',              value: 8 },
+  { label: 'Abgang (ohne Abschluss)', value: 9 },
+  { label: 'Ehemalige',              value: 10 },
+]
 
 const klassenOptionen = computed(() =>
   schuelerStore.klassen
@@ -142,9 +163,12 @@ const klassenOptionen = computed(() =>
 )
 
 const gefiltert = computed(() => {
-  const liste = schuelerStore.schueler
-  if (!selectedKlasseId.value) return liste
-  return liste.filter(s => s.klasseId === selectedKlasseId.value)
+  let liste = schuelerStore.schueler
+  if (selectedStatus.value !== null)
+    liste = liste.filter(s => s.status === selectedStatus.value)
+  if (selectedKlasseId.value !== null)
+    liste = liste.filter(s => s.klasseId === selectedKlasseId.value)
+  return liste
 })
 
 // ---------------------------------------------------------------------------
@@ -276,6 +300,7 @@ function navigiereZurPrognose(schuelerId: number) {
 }
 .toolbar-sep { flex: 1; }
 .abschnitt-select { width: 16rem; }
+.status-select { width: 14rem; }
 .klassen-select { width: 14rem; }
 
 .status-hint {

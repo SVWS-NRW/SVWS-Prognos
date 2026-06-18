@@ -45,7 +45,7 @@ export async function loadSchuelerAuswahlliste(abschnittId: number): Promise<Sch
       idKlasse: s.idKlasse,
       idJahrgang: s.idJahrgang,
       jahrgang: s.jahrgang ?? '',
-      status: s.status ?? null,
+      status: s.status != null ? Number(s.status) : null,
     }))
   const klassen: SvwsKlasse[] = (data.klassen ?? [])
     .filter((k: any) => k != null)

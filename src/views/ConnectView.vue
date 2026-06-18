@@ -67,8 +67,8 @@ import Password from 'primevue/password'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
 import { useAuthStore } from '@/stores/auth'
-import ThemeToggle from '@/components/ThemeToggle.vue'
 import LegalFooter from '@/components/LegalFooter.vue'
+import ThemeToggle from '@/components/ThemeToggle.vue'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -113,7 +113,6 @@ async function handleConnect() {
   top: 1rem;
   right: 1rem;
 }
-
 
 .connect-card {
   background: var(--surface);
