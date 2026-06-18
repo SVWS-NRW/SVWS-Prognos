@@ -3,6 +3,7 @@
     <ThemeToggle class="connect-theme" />
     <div class="connect-card">
       <h1>SVWS Prognos</h1>
+      <p class="version">v{{ version }}</p>
       <p class="subtitle">Verbindung zum SVWS-Server</p>
 
       <form @submit.prevent="handleConnect">
@@ -53,11 +54,13 @@
         />
       </form>
     </div>
+    <LegalFooter />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { version } from '../../package.json'
 import { useRouter } from 'vue-router'
 import InputText from 'primevue/inputtext'
 import Password from 'primevue/password'
@@ -65,6 +68,7 @@ import Button from 'primevue/button'
 import Message from 'primevue/message'
 import { useAuthStore } from '@/stores/auth'
 import ThemeToggle from '@/components/ThemeToggle.vue'
+import LegalFooter from '@/components/LegalFooter.vue'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -98,8 +102,10 @@ async function handleConnect() {
   min-height: 100vh;
   position: relative;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 0.75rem;
 }
 
 .connect-theme {
@@ -107,6 +113,7 @@ async function handleConnect() {
   top: 1rem;
   right: 1rem;
 }
+
 
 .connect-card {
   background: var(--surface);
@@ -119,15 +126,25 @@ async function handleConnect() {
 }
 
 h1 {
-  margin: 0 0 0.25rem;
+  margin: 0 0 0.1rem;
   font-size: 1.75rem;
   color: var(--accent);
+  text-align: center;
+}
+
+.version {
+  margin: 0 0 0.5rem;
+  font-size: 0.75rem;
+  color: var(--app-ink);
+  opacity: 0.5;
+  text-align: center;
 }
 
 .subtitle {
   margin: 0 0 2rem;
   color: var(--app-ink);
   opacity: 0.7;
+  text-align: center;
 }
 
 .field {

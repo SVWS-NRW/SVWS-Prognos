@@ -43,6 +43,8 @@
     "@ag-grid-community/vue3": "^32.3.0",
     "@primevue/themes": "^4.5.4",
     "axios": "^1.8.0",
+    "dompurify": "^3.4.11",
+    "marked": "^18.0.5",
     "pinia": "^3.0.0",
     "primeicons": "^7.0.0",
     "primevue": "^4.3.0",
@@ -50,6 +52,7 @@
     "vue-router": "^4.5.0"
   },
   "devDependencies": {
+    "@types/dompurify": "^3.0.5",
     "@vitejs/plugin-vue": "^5.2.0",
     "electron": "^42.3.1",
     "electron-builder": "^26.8.1",
