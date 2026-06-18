@@ -8,9 +8,9 @@
         text
         size="small"
         title="Zurück zur Schülertabelle"
-        @click="router.push({ name: 'jahrgang', params: { jg: jahrgang ?? '' } })"
+        @click="pruefeUndNavigiere(() => router.push({ name: 'jahrgang', params: { jg: jahrgang ?? '' } }))"
       />
-      <Button icon="pi pi-arrow-left" text size="small" @click="router.back()" />
+      <Button icon="pi pi-arrow-left" text size="small" @click="pruefeUndNavigiere(() => router.back())" />
       <span class="toolbar-title">{{ schuelerName }}<span v-if="schuelerKlasse" class="toolbar-klasse"> · {{ schuelerKlasse }}</span></span>
       <Button
         v-if="naechsterSchueler"
@@ -320,6 +320,7 @@ const istAbschlussPrognose = ref(true)
 const speichert = ref(false)
 const speichernFehler = ref<string | null>(null)
 const showNotenWarnung = ref(false)
+const pendingNavigate = ref<(() => void) | null>(null)
 
 const SCHULFORM_KUERZEL: Record<string, string> = {
   GESAMTSCHULE: 'GE', SEKUNDARSCHULE: 'SK', PRIMUSSCHULE: 'PR',
@@ -440,10 +441,22 @@ const naechsterSchueler = computed(() => {
   return idx >= 0 && idx + 1 < liste.length ? liste[idx + 1] : null
 })
 
+function pruefeUndNavigiere(navFn: () => void) {
+  if (hasChanges.value) {
+    pendingNavigate.value = navFn
+    showNotenWarnung.value = true
+    return
+  }
+  navFn()
+}
+
 function navigiereZuNaechstem() {
   if (!naechsterSchueler.value) return
-  schuelerStore.waehleSchueler(naechsterSchueler.value.id)
-  router.push({ name: 'prognose', params: { id: String(naechsterSchueler.value.id) } })
+  const ziel = naechsterSchueler.value
+  pruefeUndNavigiere(() => {
+    schuelerStore.waehleSchueler(ziel.id)
+    router.push({ name: 'prognose', params: { id: String(ziel.id) } })
+  })
 }
 
 const ergebnis = computed(() => {
@@ -574,6 +587,9 @@ async function speichern() {
 async function bestaetigenUndSpeichern() {
   showNotenWarnung.value = false
   await doSpeichern()
+  const nav = pendingNavigate.value
+  pendingNavigate.value = null
+  nav?.()
 }
 
 function verwerfenNoten() {
@@ -587,6 +603,9 @@ function verwerfenNoten() {
   })))
   lbnwNote.value = rawLernabschnitt.value?.noteLernbereichNW ?? null
   showNotenWarnung.value = false
+  const nav = pendingNavigate.value
+  pendingNavigate.value = null
+  nav?.()
 }
 
 async function doSpeichern() {
