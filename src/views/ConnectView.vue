@@ -73,13 +73,11 @@ import ThemeToggle from '@/components/ThemeToggle.vue'
 const router = useRouter()
 const auth = useAuthStore()
 
-const isDev = import.meta.env.DEV
-
 const form = ref({
-  baseUrl: isDev ? (import.meta.env.VITE_SVWS_URL ?? '') : '',
-  schema: isDev ? (import.meta.env.VITE_SVWS_SCHEMA ?? '') : '',
-  username: isDev ? (import.meta.env.VITE_SVWS_USERNAME ?? '') : '',
-  password: isDev ? (import.meta.env.VITE_SVWS_PASSWORD ?? '') : '',
+  baseUrl: import.meta.env.DEV ? (import.meta.env.VITE_SVWS_URL ?? '') : '',
+  schema: import.meta.env.DEV ? (import.meta.env.VITE_SVWS_SCHEMA ?? '') : '',
+  username: import.meta.env.DEV ? (import.meta.env.VITE_SVWS_USERNAME ?? '') : '',
+  password: import.meta.env.DEV ? (import.meta.env.VITE_SVWS_PASSWORD ?? '') : '',
 })
 
 const loading = ref(false)
