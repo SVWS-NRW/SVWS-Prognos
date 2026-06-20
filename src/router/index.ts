@@ -19,31 +19,31 @@ const router = createRouter({
       path: '/jahrgang/:jg',
       name: 'jahrgang',
       component: () => import('@/views/SchuelerauswahlView.vue'),
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, requiresSchulform: true },
     },
     {
       path: '/manuell',
       name: 'manuell',
       component: () => import('@/views/ManuellePrognoseView.vue'),
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, requiresSchulform: true },
     },
     {
       path: '/auswertungen',
       name: 'auswertungen',
       component: () => import('@/views/AuswertungenView.vue'),
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, requiresSchulform: true },
     },
     {
       path: '/schueler/:id/notenbilder',
       name: 'notenbilder',
       component: () => import('@/views/NotenbildView.vue'),
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, requiresSchulform: true },
     },
     {
       path: '/schueler/:id/prognose',
       name: 'prognose',
       component: () => import('@/views/PrognoseView.vue'),
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, requiresSchulform: true },
     },
     {
       path: '/einstellungen',
@@ -62,6 +62,9 @@ router.beforeEach((to) => {
   const auth = useAuthStore()
   if (to.meta.requiresAuth && !auth.isConnected) {
     return { name: 'connect' }
+  }
+  if (to.meta.requiresSchulform && auth.isConnected && !auth.schulformUnterstuetzt) {
+    return { name: 'dashboard' }
   }
 })
 
