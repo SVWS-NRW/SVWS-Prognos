@@ -14,9 +14,24 @@
       </div>
     </header>
 
+    <Message
+      v-if="!auth.schulformUnterstuetzt"
+      severity="warn"
+      :closable="false"
+      class="schulform-warnung"
+    >
+      <strong>Nicht unterstützte Schulform ({{ auth.schulformKuerzel }})</strong><br>
+      SVWS-Prognos ist ausschließlich für Gesamtschulen, Sekundarschulen und Primusschulen vorgesehen.
+      Eine Prognoseberechnung ist für diese Schule nicht möglich.
+    </Message>
+
     <div class="tile-grid">
       <!-- Jahrgang 8 -->
-      <div class="tile tile--nav" @click="router.push({ name: 'jahrgang', params: { jg: '8' } })">
+      <div
+        class="tile"
+        :class="auth.schulformUnterstuetzt ? 'tile--nav' : 'tile--gesperrt'"
+        @click="auth.schulformUnterstuetzt && router.push({ name: 'jahrgang', params: { jg: '8' } })"
+      >
         <div class="tile-icon tile-icon--jg">8</div>
         <div class="tile-body">
           <span class="tile-title">Jahrgang 8</span>
@@ -26,7 +41,11 @@
       </div>
 
       <!-- Jahrgang 9 -->
-      <div class="tile tile--nav" @click="router.push({ name: 'jahrgang', params: { jg: '9' } })">
+      <div
+        class="tile"
+        :class="auth.schulformUnterstuetzt ? 'tile--nav' : 'tile--gesperrt'"
+        @click="auth.schulformUnterstuetzt && router.push({ name: 'jahrgang', params: { jg: '9' } })"
+      >
         <div class="tile-icon tile-icon--jg">9</div>
         <div class="tile-body">
           <span class="tile-title">Jahrgang 9</span>
@@ -36,7 +55,11 @@
       </div>
 
       <!-- Jahrgang 10 -->
-      <div class="tile tile--nav" @click="router.push({ name: 'jahrgang', params: { jg: '10' } })">
+      <div
+        class="tile"
+        :class="auth.schulformUnterstuetzt ? 'tile--nav' : 'tile--gesperrt'"
+        @click="auth.schulformUnterstuetzt && router.push({ name: 'jahrgang', params: { jg: '10' } })"
+      >
         <div class="tile-icon tile-icon--jg">10</div>
         <div class="tile-body">
           <span class="tile-title">Jahrgang 10</span>
@@ -46,7 +69,11 @@
       </div>
 
       <!-- Manuelle Prognose -->
-      <div class="tile tile--nav tile--accent" @click="router.push({ name: 'manuell' })">
+      <div
+        class="tile"
+        :class="auth.schulformUnterstuetzt ? 'tile--nav tile--accent' : 'tile--gesperrt'"
+        @click="auth.schulformUnterstuetzt && router.push({ name: 'manuell' })"
+      >
         <div class="tile-icon"><i class="pi pi-pencil" /></div>
         <div class="tile-body">
           <span class="tile-title">Manuelle Prognose</span>
@@ -56,7 +83,11 @@
       </div>
 
       <!-- Auswertungen -->
-      <div class="tile tile--nav" @click="router.push({ name: 'auswertungen' })">
+      <div
+        class="tile"
+        :class="auth.schulformUnterstuetzt ? 'tile--nav' : 'tile--gesperrt'"
+        @click="auth.schulformUnterstuetzt && router.push({ name: 'auswertungen' })"
+      >
         <div class="tile-icon"><i class="pi pi-chart-bar" /></div>
         <div class="tile-body">
           <span class="tile-title">Auswertungen</span>
@@ -71,6 +102,8 @@
         <div class="tile-body">
           <span class="tile-title">Schuldaten</span>
           <dl class="info-list">
+            <dt>Schulform</dt>
+            <dd>{{ auth.schulformKuerzel || '–' }}</dd>
             <dt>Schema</dt>
             <dd>{{ auth.schema }}</dd>
             <dt>Server</dt>
@@ -89,6 +122,7 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
+import Message from 'primevue/message'
 import { useAuthStore } from '@/stores/auth'
 import { useSchuljahresabschnittStore } from '@/stores/schuljahresabschnitt'
 import ThemeToggle from '@/components/ThemeToggle.vue'
@@ -129,6 +163,10 @@ function handleLogout() {
   font-size: 1.5rem;
 }
 
+.schulform-warnung {
+  max-width: 680px;
+}
+
 .tile-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -167,6 +205,11 @@ function handleLogout() {
 .tile--accent .tile-icon {
   background: var(--p-primary-color);
   color: var(--p-primary-contrast-color);
+}
+
+.tile--gesperrt {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .tile--info {

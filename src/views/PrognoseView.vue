@@ -8,9 +8,9 @@
         text
         size="small"
         title="Zurück zur Schülertabelle"
-        @click="router.push({ name: 'jahrgang', params: { jg: jahrgang ?? '' } })"
+        @click="pruefeUndNavigiere(() => router.push({ name: 'jahrgang', params: { jg: jahrgang ?? '' } }))"
       />
-      <Button icon="pi pi-arrow-left" text size="small" @click="router.back()" />
+      <Button icon="pi pi-arrow-left" text size="small" @click="pruefeUndNavigiere(() => router.back())" />
       <span class="toolbar-title">{{ schuelerName }}<span v-if="schuelerKlasse" class="toolbar-klasse"> · {{ schuelerKlasse }}</span></span>
       <Button
         v-if="naechsterSchueler"
@@ -172,7 +172,7 @@
                     :options="kursartOptionen"
                     size="small"
                     class="w-kursart"
-                    @update:model-value="v => faecher[idx].kursart = v"
+                    @update:model-value="v => handleKursartChange(idx, v)"
                   />
                 </td>
                 <td class="col-center">
@@ -224,6 +224,32 @@
       </div>
 
     </div>
+
+    <!-- Hinweisdialog: Kursartwechsel -->
+    <Dialog
+      v-model:visible="showKursartWarnung"
+      modal
+      header="Kursartwechsel nicht möglich"
+      :style="{ width: '30rem' }"
+      :draggable="false"
+    >
+      <p class="noten-warn-text">
+        <i class="pi pi-info-circle" style="color: var(--p-blue-500)" />
+        Die Änderung der Kursart wird <strong>nicht gespeichert</strong> und verworfen.
+        <br><br>
+        Ein Kurswechsel verändert die Kurszuordnung des Schülers und muss direkt im
+        <strong>SVWS-Client</strong> oder in <strong>SchILD-NRW 3</strong> durchgeführt werden.
+        <br><br>
+        Zu Planungs- und Beratungszwecken wird die Prognose trotzdem berechnet.
+      </p>
+      <div class="kursart-warn-footer">
+        <Checkbox v-model="kursartWarnungNichtMehrZeigen" :binary="true" input-id="kursart-warn-chk" />
+        <label for="kursart-warn-chk" class="abschluss-label">Nicht mehr anzeigen</label>
+      </div>
+      <template #footer>
+        <Button label="Verstanden" size="small" @click="schliesseKursartWarnung" />
+      </template>
+    </Dialog>
 
     <!-- Warndialog: Noten geändert -->
     <Dialog
@@ -320,6 +346,10 @@ const istAbschlussPrognose = ref(true)
 const speichert = ref(false)
 const speichernFehler = ref<string | null>(null)
 const showNotenWarnung = ref(false)
+const showKursartWarnung = ref(false)
+const kursartWarnungNichtMehrZeigen = ref(false)
+const kursartWarnungUnterdrückt = ref(false)
+const pendingNavigate = ref<(() => void) | null>(null)
 
 const SCHULFORM_KUERZEL: Record<string, string> = {
   GESAMTSCHULE: 'GE', SEKUNDARSCHULE: 'SK', PRIMUSSCHULE: 'PR',
@@ -440,10 +470,22 @@ const naechsterSchueler = computed(() => {
   return idx >= 0 && idx + 1 < liste.length ? liste[idx + 1] : null
 })
 
+function pruefeUndNavigiere(navFn: () => void) {
+  if (hasChanges.value) {
+    pendingNavigate.value = navFn
+    showNotenWarnung.value = true
+    return
+  }
+  navFn()
+}
+
 function navigiereZuNaechstem() {
   if (!naechsterSchueler.value) return
-  schuelerStore.waehleSchueler(naechsterSchueler.value.id)
-  router.push({ name: 'prognose', params: { id: String(naechsterSchueler.value.id) } })
+  const ziel = naechsterSchueler.value
+  pruefeUndNavigiere(() => {
+    schuelerStore.waehleSchueler(ziel.id)
+    router.push({ name: 'prognose', params: { id: String(ziel.id) } })
+  })
 }
 
 const ergebnis = computed(() => {
@@ -574,6 +616,9 @@ async function speichern() {
 async function bestaetigenUndSpeichern() {
   showNotenWarnung.value = false
   await doSpeichern()
+  const nav = pendingNavigate.value
+  pendingNavigate.value = null
+  nav?.()
 }
 
 function verwerfenNoten() {
@@ -587,6 +632,9 @@ function verwerfenNoten() {
   })))
   lbnwNote.value = rawLernabschnitt.value?.noteLernbereichNW ?? null
   showNotenWarnung.value = false
+  const nav = pendingNavigate.value
+  pendingNavigate.value = null
+  nav?.()
 }
 
 async function doSpeichern() {
@@ -634,6 +682,22 @@ async function doSpeichern() {
   } finally {
     speichert.value = false
   }
+}
+
+function handleKursartChange(idx: number, v: 'E' | 'G' | 'Sonstige') {
+  const svwsId = faecher.value[idx].svwsId
+  if (svwsId !== null && !kursartWarnungUnterdrückt.value) {
+    const original = rohFaecher.value.find(f => f.svwsId === svwsId)
+    if (original && v !== original.kursart) {
+      showKursartWarnung.value = true
+    }
+  }
+  faecher.value[idx].kursart = v
+}
+
+function schliesseKursartWarnung() {
+  if (kursartWarnungNichtMehrZeigen.value) kursartWarnungUnterdrückt.value = true
+  showKursartWarnung.value = false
 }
 
 function addFach() {
@@ -879,6 +943,13 @@ function mapKursart(k: string | null): 'E' | 'G' | 'Sonstige' {
 .po-select      { width: 14rem; }
 .abschluss-select { width: 8rem; }
 .speichern-fehler { font-size: 0.72rem; color: #b91c1c; margin-left: auto; }
+
+.kursart-warn-footer {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 1rem;
+}
 
 .noten-warn-text {
   font-size: 0.85rem;

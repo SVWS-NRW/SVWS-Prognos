@@ -2,7 +2,7 @@
   <section class="impressum-section">
     <a
       class="impressum-link"
-      href="https://svws-nrw.github.io/SVWS-Prognos/"
+      href="https://doku.svws-nrw.de/svws_module/svws_prognos/"
       target="_blank"
       rel="noopener noreferrer"
     >Hilfe</a>

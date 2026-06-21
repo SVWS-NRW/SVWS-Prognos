@@ -22,10 +22,12 @@ export const useAuthStore = defineStore('auth', () => {
   const baseUrl = ref('')
   const schema = ref('')
   const username = ref('')
+  const schulformKuerzel = ref('')
   const schulform = ref<Schulform>('GESAMTSCHULE')
   const _connected = ref(false)
 
   const isConnected = computed(() => _connected.value)
+  const schulformUnterstuetzt = computed(() => schulformKuerzel.value in SVWS_SCHULFORM)
 
   async function connect(config: AuthConfig): Promise<void> {
     createApiClient(config.baseUrl, config.schema, config.username, config.password)
@@ -35,6 +37,7 @@ export const useAuthStore = defineStore('auth', () => {
     baseUrl.value = config.baseUrl
     schema.value = config.schema
     username.value = config.username
+    schulformKuerzel.value = stammdaten.schulform
     schulform.value = SVWS_SCHULFORM[stammdaten.schulform] ?? 'GESAMTSCHULE'
     _connected.value = true
   }
@@ -46,9 +49,10 @@ export const useAuthStore = defineStore('auth', () => {
     baseUrl.value = ''
     schema.value = ''
     username.value = ''
+    schulformKuerzel.value = ''
     schulform.value = 'GESAMTSCHULE'
     _connected.value = false
   }
 
-  return { baseUrl, schema, username, schulform, isConnected, connect, disconnect }
+  return { baseUrl, schema, username, schulform, schulformKuerzel, schulformUnterstuetzt, isConnected, connect, disconnect }
 })
