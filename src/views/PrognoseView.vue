@@ -59,7 +59,8 @@
     <Message v-else-if="fehler" severity="error">{{ fehler }}</Message>
 
     <!-- Hauptbereich -->
-    <div v-else class="main-layout">
+    <template v-else>
+    <div class="main-layout">
 
       <!-- Fächerkarte -->
       <div class="card">
@@ -210,6 +211,8 @@
             </div>
           </div>
           <div class="result-protokoll">
+            <div class="plog plog--info">Berechnung wurde mit {{ notenModus === 'quartal' ? 'Quartalsnoten' : 'Halbjahresnoten' }} durchgeführt.</div>
+            <div class="plog">&nbsp;</div>
             <div
               v-for="(line, i) in ergebnis.protokoll"
               :key="i"
@@ -224,6 +227,7 @@
       </div>
 
     </div>
+    </template>
 
     <!-- Hinweisdialog: Kursartwechsel -->
     <Dialog
@@ -920,6 +924,7 @@ function mapKursart(k: string | null): 'E' | 'G' | 'Sonstige' {
 .plog--fail   { color: #b91c1c; }
 .plog--warn   { color: #b45309; }
 .plog--result { font-weight: 700; font-size: 0.72rem; color: var(--p-primary-color); margin-top: 0.2rem; }
+.plog--info   { color: #60a5fa; margin-bottom: 0.3rem; }
 
 .result-icon-leer { font-size: 1.4rem; opacity: 0.3; }
 .result-leer-text { font-size: 0.68rem; line-height: 1.3; }
