@@ -32,7 +32,7 @@ SVWS-Prognos steht in drei Varianten bereit:
 
 | Variante | Betriebssystem | Datei |
 |---|---|---|
-| **Desktop-App (Windows)** | Windows 10 / 11 | `SVWS-Prognos-x.x.x.exe` |
+| **Desktop-App (Windows)** | Windows 10 / 11 | `SVWS-Prognos-Setup-x.x.x.exe` |
 | **Desktop-App (Linux)** | Ubuntu, Fedora u. a. | `SVWS-Prognos-x.x.x.AppImage` |
 | **Web-Bundle** | Beliebiger Browser | `SVWS-Prognos-x.x.x-webserver.zip` |
 
@@ -49,7 +49,7 @@ Die aktuellen Downloads finden Sie auf der [Release-Seite des Projekts](https://
 
 ### Schritte
 
-1. Laden Sie die Datei `SVWS-Prognos-x.x.x.exe` herunter.
+1. Laden Sie die Datei `SVWS-Prognos-Setup-x.x.x.exe` herunter.
 2. Starten Sie die Installationsdatei mit einem Doppelklick.
 3. Folgen Sie dem Installationsassistenten.
 4. SVWS-Prognos wird im Startmenü eingetragen und kann direkt geöffnet werden.
@@ -107,7 +107,21 @@ Wenn Sie SVWS-Prognos auf einem Schulserver als Web-Anwendung bereitstellen möc
 
 3. Rufen Sie die App im Browser auf: `https://ihr-schulserver.de/prognos/`
 
-> **CORS-Hinweis:** Im Web-Browser-Betrieb muss der SVWS-Server CORS-Anfragen von Ihrer Domain erlauben. Wenden Sie sich dazu an Ihren SVWS-Administrator.
+> **CORS-Hinweis:** Die Web-App greift von ihrer eigenen Adresse aus auf den SVWS-Server zu (Cross-Origin). Der SVWS-Server erlaubt das in der Standardkonfiguration (`Access-Control-Allow-Origin: *`), eine Anpassung am Server ist normalerweise nicht nötig.
+
+### Web-App im Internet, SVWS-Server im Schulnetz
+
+Liegt die Web-App auf einem öffentlich erreichbaren Webspace, der SVWS-Server aber im Schulnetz oder auf dem eigenen Rechner (`localhost`), greift eine öffentliche Seite auf ein lokales Netz zu. Aktuelle Browser erlauben das nur mit ausdrücklicher Zustimmung („Local Network Access“):
+
+- **Chrome/Edge:** Ohne Freigabe schlagen alle Anfragen fehl. Freigabe über das Symbol links neben der Adresse → Website-Einstellungen → „Lokales Netzwerk“ → Zulassen.
+- **Firefox:** Freigabe über das Berechtigungs-Symbol neben der Adresse („Auf dieses Gerät zugreifen“) dauerhaft auf „Erlaubt“ setzen und **Firefox danach neu starten**. Ist die Freigabe nur „Temporär erlaubt“ oder wurde sie in der laufenden Sitzung geändert, scheitern einzelne Anfragen (Fehler „CORS Failed“, z. B. fehlende Abschlussdaten bei manchen Schülern).
+
+Verwendet der SVWS-Server ein selbstsigniertes Zertifikat, muss der Browser diesem außerdem vertrauen, sonst scheitert bereits die Anmeldung – siehe [SSL-Zertifikatsfehler](hilfe.md#ssl-zertifikatsfehler).
+
+Zuverlässig ohne diese Einschränkung sind:
+
+- die **Desktop-App** (Windows/Linux), oder
+- das Web-Bundle auf einem Webserver **im selben Netz** wie der SVWS-Server bzw. unter derselben Adresse.
 
 ---
 
