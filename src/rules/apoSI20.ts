@@ -2,7 +2,7 @@
 // Referenz: delphiSrc/Shared/PrognoseUtils.pas (tPrognoseBerechnung)
 
 import type { Regelwerk, RegelwerkErgebnis, EingabeFach } from './types'
-import type { AbschlussTyp } from '@/models/PrognoseErgebnis'
+import type { AbschlussTyp, PrognoseHinweis } from '@/models/PrognoseErgebnis'
 
 const APO20_IGNO = new Set(['LBAL', 'AT', 'AH', 'AW', 'PK'])
 
@@ -118,9 +118,9 @@ interface MSAFaecher {
   fldNW: string | null  // kuerzel des FLD-NW-Fachs (nach Konvertierung)
 }
 
+// Ohne FLD-NW (Jg. 8, Jg. 9/1. Hj.) rechnet PM2 MSA/MSA-Q trotzdem; ob sie Pflicht ist, prüft vorpruefung()
 function buildFG_MSA(faecher: EingabeFach[], forMSAQ: boolean): MSAFaecher | null {
   const fldNWKuerzel = getFLDNW(faecher)
-  if (fldNWKuerzel === null) return null
 
   const fg1Keys = new Set(['D', 'E', 'M', 'WPU'])
   const igno = new Set([...APO20_IGNO, 'LBNW'])
@@ -144,7 +144,7 @@ function buildFG_MSA(faecher: EingabeFach[], forMSAQ: boolean): MSAFaecher | nul
 
   if (remaining > threshold) {
     // Schritt 1: FLD-NW aus FG2 konvertieren
-    const fldEntry = raw2.get(fldNWKuerzel)
+    const fldEntry = fldNWKuerzel ? raw2.get(fldNWKuerzel) : undefined
     if (fldEntry && fldEntry.niveau === 'E') {
       fldEntry.note = fldEntry.note > 1 ? fldEntry.note - 1 : 1
       fldEntry.niveau = 'G'
@@ -247,9 +247,9 @@ function checkMSAAusgleich(f: MSAFaecher): boolean {
   let fg2Ausgleich = false
 
   if (fehlX3 > 0) {
-    // "1x3-Defizit": ausgleichbar durch X≤2, FLD-NW≤3, oder freien FG1-Surplus
+    // "1x3-Defizit": ausgleichbar durch X≤2, FLD-NW (E≤3, G≤2), oder freien FG1-Surplus
     const xLe2 = countNote(fg2Rest, new Set([1, 2]), 'X')
-    const fldNWAus = countNote(fg2Rest, new Set([1, 2, 3]), 'E') + countNote(fg2Rest, new Set([1, 2, 3]), 'G')
+    const fldNWAus = countNote(fg2Rest, new Set([1, 2, 3]), 'E') + countNote(fg2Rest, new Set([1, 2]), 'G')
     const fg1Frei = fg1Aus > 0 && !fg1Ausgleich
     if (xLe2 === 0 && fldNWAus === 0 && !fg1Frei) return false
     if (xLe2 > 0 || fldNWAus > 0) fg2Ausgleich = true
@@ -378,11 +378,77 @@ const msaDef1 = (f: FGFach) =>
 const msaqDef1 = (f: FGFach) =>
   (f.fgNiveau === 'E' && f.fgNote >= 4) || (f.fgNiveau === 'G' && f.fgNote >= 3) || (f.fgNiveau === 'X' && f.fgNote >= 4)
 
+// ─── Vorprüfung (PM2: AddDokuPreCheck) ─────────────────────────────────────
+
+const hatKurs = (f: EingabeFach) => f.kursart === 'E' || f.kursart === 'G'
+
+interface Vorpruefung {
+  faecher: EingabeFach[]      // ggf. ohne EK/GE/WP (bei GL-Note)
+  hinweise: PrognoseHinweis[]
+  abbruchAlle: string | null  // PM2 bricht jede Prüfung ab (außer ESA nach Jg. 10)
+  abbruchMSA: string | null   // PM2 bricht MSA/MSA-Q ab
+}
+
+function vorpruefung(jahrgang: string | null, halbjahr: 1 | 2 | null, eingabe: EingabeFach[]): Vorpruefung {
+  const hinweise: PrognoseHinweis[] = []
+  const hat = (kz: string) => eingabe.some(f => normKuerzel(f.kuerzel) === kz)
+  let faecher = eingabe
+  let abbruchAlle: string | null = null
+  let abbruchMSA: string | null = null
+
+  // PM2 meldet einen Fehler; wie in SetFaecherGruppen zählen EK/GE/WP neben GL nicht mit
+  const glEinzel = ['EK', 'GE', 'WP'].filter(hat)
+  if (hat('GL') && glEinzel.length > 0) {
+    faecher = eingabe.filter(f => !glEinzel.includes(normKuerzel(f.kuerzel)))
+    hinweise.push({
+      schwere: 'warnung',
+      regelId: 'VOR-GL-EINZELNOTEN',
+      text: `GL-Note vorhanden: Einzelnoten in ${glEinzel.join(', ')} sind nicht zulässig und werden ignoriert.`,
+    })
+  }
+
+  const nwKurse = ['CH', 'PH', 'BI'].filter(kz => eingabe.some(f => normKuerzel(f.kuerzel) === kz && hatKurs(f)))
+  if (nwKurse.length > 1) {
+    abbruchAlle = `FLD nur in einem der Fächer CH, PH oder BI zulässig (vorhanden: ${nwKurse.join(', ')})`
+    hinweise.push({ schwere: 'kritisch', regelId: 'VOR-FLD-NW-MEHRFACH', text: `${abbruchAlle}.` })
+  }
+
+  // Ab Jg. 9/2. Hj. FLD in D, E, M und einem NW-Fach, davor nur in E und M.
+  // Jg. 9 ohne Halbjahresangabe: PM2 prüft dann keine FLD.
+  const abHj2Jg9 = jahrgang === '10' || (jahrgang === '9' && halbjahr === 2)
+  const vorHj2Jg9 = jahrgang === '8' || (jahrgang === '9' && halbjahr === 1)
+  const pflichtFLD = abHj2Jg9 ? ['D', 'E', 'M'] : vorHj2Jg9 ? ['E', 'M'] : []
+  const ohneFLD = pflichtFLD.filter(kz => !eingabe.some(f => normKuerzel(f.kuerzel) === kz && hatKurs(f)))
+  if (ohneFLD.length > 0) {
+    abbruchMSA = `FLD (E-/G-Kurs) fehlt in ${ohneFLD.join(', ')}`
+    hinweise.push({ schwere: 'kritisch', regelId: 'VOR-FLD-DEM', text: `${abbruchMSA} → MSA/MSA-Q nicht prüfbar.` })
+  }
+  if (abHj2Jg9 && nwKurse.length === 0) {
+    const text = 'FLD (E-/G-Kurs) fehlt in CH, PH und BI'
+    abbruchMSA = abbruchMSA ? `${abbruchMSA}; ${text}` : text
+    hinweise.push({ schwere: 'kritisch', regelId: 'VOR-FLD-NW', text: `${text} → MSA/MSA-Q nicht prüfbar.` })
+  }
+
+  return { faecher, hinweise, abbruchAlle, abbruchMSA }
+}
+
 // ─── Hauptlogik ────────────────────────────────────────────────────────────
 
-function berechneApoSI20(jahrgang: string | null, faecher: EingabeFach[]): { abschluss: AbschlussTyp; protokoll: string[] } {
+function berechneApoSI20(
+  jahrgang: string | null,
+  halbjahr: 1 | 2 | null,
+  eingabe: EingabeFach[],
+): { abschluss: AbschlussTyp; protokoll: string[]; hinweise: PrognoseHinweis[] } {
   const log: string[] = []
   const L = (s: string) => log.push(s)
+
+  const { faecher, hinweise, abbruchAlle, abbruchMSA } = vorpruefung(jahrgang, halbjahr, eingabe)
+  if (hinweise.length > 0) {
+    L('Vorprüfung')
+    L('──────────')
+    for (const h of hinweise) L(`  ⚠ ${h.text}`)
+    L('')
+  }
 
   let esaErreicht = false
   let prognose: AbschlussTyp = 'OA'
@@ -395,6 +461,8 @@ function berechneApoSI20(jahrgang: string | null, faecher: EingabeFach[]): { abs
     prognose = 'ESA'
     L('  Jg. 10 → automatisch (§40 Abs. 3)')
     L('  ✓ ESA')
+  } else if (abbruchAlle) {
+    L(`  ✗ Abbruch: ${abbruchAlle}`)
   } else {
     const igno = ignoriertStr(faecher, new Set(['LBNW']))
     if (igno) L(`  Ignoriere: ${igno}`)
@@ -423,9 +491,11 @@ function berechneApoSI20(jahrgang: string | null, faecher: EingabeFach[]): { abs
   L('Prüfe EESA')
   L('──────────')
   const ignoEESA = ignoriertStr(faecher, new Set(['BI', 'CH', 'PH']))
-  if (ignoEESA) L(`  Ignoriere: ${ignoEESA}`)
-  const eesaFG = buildFG_EESA(faecher)
-  if (eesaFG === null) {
+  if (ignoEESA && !abbruchAlle) L(`  Ignoriere: ${ignoEESA}`)
+  const eesaFG = abbruchAlle ? null : buildFG_EESA(faecher)
+  if (abbruchAlle) {
+    L(`  ✗ Abbruch: ${abbruchAlle}`)
+  } else if (eesaFG === null) {
     L('  Kein LBNW → nicht prüfbar')
   } else {
     L(`  FG1: ${fgStr(eesaFG.fg1)}`)
@@ -447,12 +517,15 @@ function berechneApoSI20(jahrgang: string | null, faecher: EingabeFach[]): { abs
     L('')
     L('Prüfe MSA')
     L('─────────')
-    const msaF = buildFG_MSA(faecher, false)
-    if (msaF === null) {
-      L('  Kein NW-Fach mit FLD (CH/PH/BI) → nicht prüfbar')
+    const abbruch = abbruchAlle ?? abbruchMSA
+    const msaF = abbruch ? null : buildFG_MSA(faecher, false)
+    if (abbruch) {
+      L(`  ✗ Abbruch: ${abbruch}`)
+    } else if (msaF === null) {
+      L('  FG1 oder FG2 leer → nicht prüfbar')
     } else {
       const fldFach = faecher.find(f => normKuerzel(f.kuerzel) === msaF.fldNW)
-      L(`  FLD-NW: ${msaF.fldNW} (${fldFach?.kursart ?? '?'}-Kurs)`)
+      L(msaF.fldNW ? `  FLD-NW: ${msaF.fldNW} (${fldFach?.kursart ?? '?'}-Kurs)` : '  FLD-NW: keine')
       L(`  FG1: ${fgStr(msaF.fg1)}`)
       L(`  FG2: ${fgStr(msaF.fg2)}`)
       const d1 = defStr(msaF.fg1, msaDef1)
@@ -511,18 +584,18 @@ function berechneApoSI20(jahrgang: string | null, faecher: EingabeFach[]): { abs
   L('')
   L(`══ Ergebnis: ${prognose} ══`)
 
-  return { abschluss: prognose, protokoll: log }
+  return { abschluss: prognose, protokoll: log, hinweise }
 }
 
 // ─── Regelwerk-Export ──────────────────────────────────────────────────────
 
 export const apoSI20Regelwerk: Regelwerk = (input): RegelwerkErgebnis => {
-  const { abschluss, protokoll } = berechneApoSI20(input.jahrgang, input.faecher)
+  const { abschluss, protokoll, hinweise } = berechneApoSI20(input.jahrgang, input.halbjahr ?? null, input.faecher)
   return {
     empfehlung: abschluss,
     alternativen: [],
-    hinweise: [],
-    vollstaendig: true,
+    hinweise,
+    vollstaendig: hinweise.length === 0,
     protokoll,
   }
 }

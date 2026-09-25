@@ -12,6 +12,7 @@ export interface EingabeFach {
 
 export interface RegelwerkInput {
   jahrgang: string | null
+  halbjahr?: 1 | 2 | null  // null/fehlend: unbekannt
   schulform: Schulform
   faecher: EingabeFach[]
 }

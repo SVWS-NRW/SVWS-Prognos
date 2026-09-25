@@ -296,12 +296,31 @@ npm run build        # Produktions-Build nach dist/
 
 3. **WP-Normierung**: `WP1`, `WP2`, etc. werden intern zu `WPU`. Im Eingabeformular
    kann der Nutzer `WP1` eingeben — die Normierung passiert in `normKuerzel()`.
+   SVWS-Daten tragen Schulkürzel (`F6 WP1`, `E5`, `REL` …): `services/prognoseEingabe.ts`
+   ordnet sie wie PM2 zu — WP-Fach über Kursart `WPI` → `WPU`, `EGSN` über Kursart,
+   Kernfächer/NW/AL/GL über das Statistik-Kürzel. Gegen `prognose_leistungsdaten`
+   des SVWS-Servers geprüft (239 Schüler Jg 9/10, identische Prognosen).
 
 4. **ZusatzFS**: Nur `istFremdsprache=true && kuerzel≠'E'` gilt als Zusatz-FS.
    Englisch (`E`) ist KEIN ZusatzFS, auch wenn `istFremdsprache=true` gesetzt ist.
 
 5. **MSAQ FLD-NW-Schwelle**: Verwendet **MSA-Niveau-Schwellen** (G≥5), NICHT MSAQ-Schwellen
-   (G≥4). Das war ein kritischer Bug, der drei Tests zum Scheitern brachte.
+   (G≥4). Die Sperre ist ergebnisneutral: In PM2 ist sie toter Code (`FLD_NW_Fach` wird
+   nie belegt), die Fälle scheitern ohnehin an der 2NS/3NS-Prüfung.
 
 6. **MSAQ fg2DefAnz**: Zählt nur `fg2_1NSAnz` (nicht `+ fg2_2NSAnz`), weil 2NS-Fächer
    bereits in 1NS enthalten sind.
+
+7. **MSA-Ausgleich fehlende "3"**: FLD-NW gleicht nur mit E≤3 oder **G≤2** aus
+   (PM2 `CheckMSAAusgleich`), nicht mit G=3.
+
+8. **Vorprüfung** (`vorpruefung()` in `apoSI20.ts`, PM2 `AddDokuPreCheck`): Befunde landen in
+   `hinweise`, `vollstaendig` wird `false`, Speichern bleibt erlaubt.
+   - GL-Note + Einzelnoten EK/GE/WP → Warnung, EK/GE/WP werden ignoriert (PM2 bricht ab).
+   - Mehr als ein NW-Fach mit E-/G-Kurs → alle Prüfungen abgebrochen (außer ESA Jg. 10).
+   - FLD-Pflicht (`RegelwerkInput.halbjahr` = Abschnitt 1/2): Jg. 8 und Jg. 9/1. Hj. nur
+     E, M; ab Jg. 9/2. Hj. D, E, M und ein NW-Fach (CH/PH/BI). Fehlt eine → MSA/MSA-Q
+     abgebrochen. Vorher rechnet MSA auch ohne NW-Kurs. Jg. 9 ohne Halbjahr: keine FLD-Pflicht.
+     Der SVWS-Server kennt keinen Quartalsbetrieb mehr: Abschnitt = Halbjahr, pro Abschnitt
+     gibt es eine Quartals- und eine Halbjahresnote (`noteQuartal`/`note`). Die Umrechnung
+     von vier Abschnitten in PM2 (`GetPM2Halbjahr`) ist daher bewusst nicht übernommen.
