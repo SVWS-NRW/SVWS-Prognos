@@ -91,29 +91,32 @@ PM2 zusätzlich Einzelnoten zurück:
 Die Konvertierung zwischen PM2-Kürzeln und SchILD-Feldwerten übernimmt
 `PMAbschlusstoSchILDAbschluss()` in `Shared/BaseUtils.pas:4081`.
 
-## Ziel-Implementierung in SVWS-Prognos
+## Umsetzung in SVWS-Prognos
 
-```typescript
-// svwsService.ts — Entwurf
-async function speichereAbschlussPrognose(
-  lernabschnittId: number,
-  prognose: AbschlussTyp,       // 'OA' | 'ESA' | 'EESA' | 'MSA' | 'MSA_Q'
-  pruefAlgoErgebnis: string,
-  gesamtnoteNW?: string,
-  moeglNPFaecher?: string,
-): Promise<void> {
-  const abschluss = abschlussTypToSchild(prognose); // z.B. 'GE/APO-SI20/MSA'
-  await apiClient.patch(`/lernabschnittsdaten/${lernabschnittId}`, {
-    abschluss,
-    abschlIstPrognose: true,     // PFLICHT — ohne dieses Flag gilt es als Endabschluss
-    pruefAlgoErgebnis,
-    gesamtnoteNW,
-    moeglNPFaecher,
-  });
-}
-```
+`PATCH /db/{schema}/schueler/lernabschnittsdaten/{id}` in `PrognoseView.doSpeichern()`,
+Zuordnung zentral in `services/schildAbschluss.ts`:
 
-Die Abbildungsfunktion `abschlussTypToSchild()` entspricht `PMAbschlusstoSchILDAbschluss()`.
+| SVWS-Feld | Wert | PM2/SchILD-Entsprechung |
+|---|---|---|
+| `abschluss` | `GE/APO-SI20/OA` · `/ESA` · `/EESA` · `/MSA` · `/MSAQ-E` | `Abschluss` |
+| `abschlussart` | `0` bei OA, sonst `1` | `AbschlussArt` (setzt SchILD3) |
+| `istAbschlussPrognose` | Checkbox „Ist Prognose“ | `AbschlIstPrognose` |
+| `textErgebnisPruefungsalgorithmus` | Kopfzeile + Berechnungsprotokoll als Text | `PruefAlgoErgebnis` |
+| `pruefungsOrdnung` | gewählte Prüfungsordnung | – |
+| `noteLernbereichNW` | nur bei Änderung | `Gesamtnote_NW` |
+
+- Die Kürzel entsprechen `OP_Krz` aus `/schild3/pruefungsordnungen/optionen`. Gesamt-,
+  Sekundar- und Primusschule nutzen alle die Prüfungsordnung `GE/APO-SI20/5-10`.
+- **Derzeit abgeschaltet** (`ABSCHLUSS_SPEICHERN = false`): Der SVWS-Server lehnt beim PATCH
+  jedes `abschluss` ab, das nicht im ASD-Katalog `SchulabschlussAllgemeinbildend` steht
+  (409 CONFLICT), also auch alle Schild-Kürzel. `abschlussart` und das Protokoll werden
+  weiter geschrieben. Wieder einschalten, sobald der Server korrigiert ist.
+- Der Abschluss wird nur geschrieben, wenn die gewählte Prüfungsordnung APO-SI20 ist,
+  weil die Engine nur APO-SI20 berechnet.
+- Nicht geschrieben werden `versetzungsvermerk` (eigene Berechnung, folgt später) und
+  `nachpruefungen.moegliche` (Nachprüfungsfächer berechnet die Engine noch nicht).
+- Gelesen werden gespeicherte Abschlüsse über `schildZuAbschluss()`, das auch die
+  APO-SI05-Kürzel (`HA`, `HA10`, `FOR`, `FORQ-E`) älterer Daten versteht.
 
 ## Konsequenzen
 

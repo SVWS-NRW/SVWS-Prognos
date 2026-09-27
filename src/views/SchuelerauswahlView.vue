@@ -122,6 +122,7 @@ import Message from 'primevue/message'
 import { useSchuelerStore } from '@/stores/schueler'
 import { useSchuljahresabschnittStore } from '@/stores/schuljahresabschnitt'
 import ThemeToggle from '@/components/ThemeToggle.vue'
+import { ABSCHLUSS_KURZ, schildZuAbschluss } from '@/services/schildAbschluss'
 
 const route = useRoute()
 const router = useRouter()
@@ -225,21 +226,11 @@ onUnmounted(() => {
   window.removeEventListener('mouseup', onMouseUp)
 })
 
-const ABSCHLUSS_LABEL: Record<string, string> = {
-  'FOR':    'MSA',
-  'FORQ-E': 'MSA/Q',
-  'HA10':   'HA10',
-  'HA':     'HA9',
-  'OA':     'OA',
-  'ESA':    'ESA',
-}
-
 function formatAbschluss(s: { svwsAbschluss?: string | null }): string {
   if (s.svwsAbschluss === undefined) return '…'
   if (!s.svwsAbschluss) return '–'
-  const parts = s.svwsAbschluss.split('/')
-  const kuerzel = parts[parts.length - 1] ?? s.svwsAbschluss
-  return ABSCHLUSS_LABEL[kuerzel] ?? kuerzel
+  const abschluss = schildZuAbschluss(s.svwsAbschluss)
+  return abschluss ? ABSCHLUSS_KURZ[abschluss] : (s.svwsAbschluss.split('/').pop() ?? s.svwsAbschluss)
 }
 
 function formatPruefungsordnung(s: { svwsPruefungsOrdnung?: string | null; svwsAbschluss?: string | null }): string {

@@ -15,6 +15,7 @@ export interface SvwsLernabschnittsdaten {
   noteLernbereichNW: number | null
   noteLernbereichGSbzwAL: number | null
   abschluss: string | null
+  abschlussart: number | null
   istAbschlussPrognose: boolean | null
   pruefungsOrdnung: string | null
   leistungsdaten: SvwsLeistungsdaten[]

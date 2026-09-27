@@ -209,6 +209,8 @@ import Tag from 'primevue/tag'
 import { useSchuelerStore } from '@/stores/schueler'
 import { useSchuljahresabschnittStore } from '@/stores/schuljahresabschnitt'
 import ThemeToggle from '@/components/ThemeToggle.vue'
+import { ABSCHLUSS_KURZ, schildZuAbschluss } from '@/services/schildAbschluss'
+import type { AbschlussTyp } from '@/models/PrognoseErgebnis'
 
 const router = useRouter()
 const schuelerStore = useSchuelerStore()
@@ -255,27 +257,16 @@ const abschnittOptionen = computed(() =>
 // Abschluss-Hilfsfunktionen
 // ---------------------------------------------------------------------------
 
-type AbschlussKat = 'OA' | 'ESA' | 'EESA' | 'MSA' | 'MSA_Q' | 'offen'
+type AbschlussKat = AbschlussTyp | 'offen'
 
 function svwsZuKat(svwsAbschluss: string | null | undefined): AbschlussKat {
-  if (!svwsAbschluss) return 'offen'
-  const kuerzel = svwsAbschluss.split('/').slice(-1)[0] ?? ''
-  if (kuerzel === 'OA') return 'OA'
-  if (kuerzel === 'HA' || kuerzel === 'ESA') return 'ESA'
-  if (kuerzel === 'HA10' || kuerzel === 'EESA') return 'EESA'
-  if (kuerzel === 'FOR') return 'MSA'
-  if (kuerzel === 'FORQ-E' || kuerzel === 'FORQ') return 'MSA_Q'
-  return 'offen'
-}
-
-const ABSCHLUSS_LABEL: Record<string, string> = {
-  FOR: 'MSA', 'FORQ-E': 'MSA/Q', FORQ: 'MSA/Q', HA10: 'EESA', HA: 'ESA', OA: 'OA', ESA: 'ESA', EESA: 'EESA',
+  return schildZuAbschluss(svwsAbschluss) ?? 'offen'
 }
 
 function formatAbschluss(svwsAbschluss: string | null | undefined): string {
   if (!svwsAbschluss) return '–'
-  const kuerzel = svwsAbschluss.split('/').slice(-1)[0] ?? svwsAbschluss
-  return ABSCHLUSS_LABEL[kuerzel] ?? kuerzel
+  const abschluss = schildZuAbschluss(svwsAbschluss)
+  return abschluss ? ABSCHLUSS_KURZ[abschluss] : (svwsAbschluss.split('/').pop() ?? svwsAbschluss)
 }
 
 function abschlussZuSeverity(svwsAbschluss: string | null | undefined): 'danger' | 'warn' | 'secondary' {

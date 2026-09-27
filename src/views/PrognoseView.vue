@@ -96,6 +96,12 @@
             <Checkbox v-model="istAbschlussPrognose" :binary="true" input-id="ist-prog-chk" />
             <label for="ist-prog-chk" class="abschluss-label">Ist Prognose</label>
           </div>
+          <div v-if="!ABSCHLUSS_SPEICHERN" class="abschluss-hinweis">
+            Abschluss wird vorerst nicht gespeichert (Korrektur im SVWS-Server ausstehend)
+          </div>
+          <div v-else-if="!abschlussWirdGespeichert" class="abschluss-hinweis">
+            Abschluss wird nur mit Prüfungsordnung APO-SI20 gespeichert
+          </div>
           <div v-if="speichernFehler" class="speichern-fehler">{{ speichernFehler }}</div>
         </div>
 
@@ -316,6 +322,7 @@ import {
 } from '@/services/svwsService'
 import type { SvwsPruefungsordnung } from '@/services/svwsService'
 import { ordneRechenKuerzelZu } from '@/services/prognoseEingabe'
+import { ABSCHLUSS_KURZ, ABSCHLUSS_SPEICHERN, abschlussZuSchild, abschlussartZuSchild, istApoSI20 } from '@/services/schildAbschluss'
 import type { FachDaten } from '@/models/Fach'
 import type { SvwsLernabschnittsdaten } from '@/models/Lernabschnitt'
 import ThemeToggle from '@/components/ThemeToggle.vue'
@@ -369,24 +376,21 @@ const SCHULFORM_KUERZEL: Record<string, string> = {
   GESAMTSCHULE: 'GE', SEKUNDARSCHULE: 'SK', PRIMUSSCHULE: 'PR',
 }
 
-// Mapping: Prognose-Empfehlung → SVWS-Abschluss-Code (APO-SI20-Nomenklatur)
-const EMPFEHLUNG_ZU_SVWS: Record<string, string> = {
-  OA: 'OA', ESA: 'ESA', EESA: 'HA10', MSA: 'MSA', MSA_Q: 'MSA-Q',
-}
-
-const ABSCHLUSS_LABEL: Record<string, string> = {
-  OA: 'Ohne Abschluss', ESA: 'ESA', HA: 'HA9', HA10: 'HA10',
-  FOR: 'MSA', 'FORQ-E': 'MSA/Q', MSA: 'MSA', 'MSA-Q': 'MSA/Q',
-}
-
 const berechneterAbschlussCode = computed(() =>
-  ergebnis.value ? (EMPFEHLUNG_ZU_SVWS[ergebnis.value.empfehlung] ?? null) : null
+  ergebnis.value ? abschlussZuSchild(ergebnis.value.empfehlung) : null
 )
 
-const berechneterAbschlussAnzeige = computed(() => {
-  const code = berechneterAbschlussCode.value
-  if (!code) return '–'
-  return ABSCHLUSS_LABEL[code] ? `${code} – ${ABSCHLUSS_LABEL[code]}` : code
+const berechneterAbschlussAnzeige = computed(() => berechneterAbschlussCode.value ?? '–')
+
+// Der Abschluss wird nur zusammen mit APO-SI20 gespeichert, weil nur dafür gerechnet wird
+const abschlussWirdGespeichert = computed(() => istApoSI20(selectedPO.value))
+
+const abschlussGeaendert = computed(() => {
+  if (!abschlussWirdGespeichert.value || !ergebnis.value) return false
+  const la = rawLernabschnitt.value
+  return ABSCHLUSS_SPEICHERN
+    ? berechneterAbschlussCode.value !== (la?.abschluss ?? null)
+    : abschlussartZuSchild(ergebnis.value.empfehlung) !== (la?.abschlussart ?? null)
 })
 
 // Eindeutige PO-Namen aus der API (z.B. "APO-SI20" aus "GE/APO-SI20/5-10")
@@ -441,6 +445,7 @@ const hasChanges = computed(() => {
   if (istAbschlussPrognose.value !== (la.istAbschlussPrognose ?? !istAbschlussPrognose.value)) return true
   if (faecherGeloescht.value) return true
   if (neueFaecherVorhanden.value) return true
+  if (abschlussGeaendert.value) return true
   return notenGeaendert.value
 })
 
@@ -667,6 +672,11 @@ async function doSpeichern() {
       istAbschlussPrognose: istAbschlussPrognose.value,
     }
     if (selectedPO.value) body.pruefungsOrdnung = selectedPO.value
+    if (abschlussWirdGespeichert.value && ergebnis.value) {
+      if (ABSCHLUSS_SPEICHERN) body.abschluss = abschlussZuSchild(ergebnis.value.empfehlung)
+      body.abschlussart = abschlussartZuSchild(ergebnis.value.empfehlung)
+      body.textErgebnisPruefungsalgorithmus = protokollText(ergebnis.value.empfehlung, ergebnis.value.protokoll)
+    }
     if (lbnwNote.value !== rawLernabschnitt.value.noteLernbereichNW) {
       body.noteLernbereichNW = lbnwNote.value
     }
@@ -723,6 +733,12 @@ function schliesseKursartWarnung() {
 
 function addFach() {
   faecher.value.push({ kuerzel: '', bezeichnung: '', note: null, kursart: 'Sonstige', istFremdsprache: false, svwsId: null })
+}
+
+function protokollText(empfehlung: AbschlussTyp, protokoll: string[]): string {
+  const kopf = `SVWS-Prognos · APO-SI20 · Jg. ${jahrgang.value ?? '–'}${halbjahr.value ? `/${halbjahr.value}. Hj.` : ''}`
+    + ` · ${notenModus.value === 'quartal' ? 'Quartalsnoten' : 'Halbjahresnoten'} · ${new Date().toLocaleString('de-DE')}`
+  return [kopf, `Prognose: ${ABSCHLUSS_KURZ[empfehlung]}`, '', ...protokoll].join('\n')
 }
 
 function protokollClass(line: string): string {
@@ -969,6 +985,7 @@ function mapKursart(k: string | null): 'E' | 'G' | 'Sonstige' {
 .po-select      { width: 14rem; }
 .abschluss-select { width: 8rem; }
 .speichern-fehler { font-size: 0.72rem; color: #b91c1c; margin-left: auto; }
+.abschluss-hinweis { font-size: 0.72rem; color: #b45309; }
 
 .kursart-warn-footer {
   display: flex;
