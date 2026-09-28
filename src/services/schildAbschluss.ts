@@ -2,7 +2,9 @@ import type { AbschlussTyp } from '@/models/PrognoseErgebnis'
 
 // Abschluss-Kürzel aus /schild3/pruefungsordnungen/optionen (OP_Krz). GE, SK und PS
 // verwenden alle die Prüfungsordnung GE/APO-SI20/5-10 und damit das Präfix GE/APO-SI20/.
+// Die Schulform steht dort nur in PO_Schulform bzw. OP_Schulformen, nicht im Kürzel.
 const APO_SI20_PRAEFIX = 'GE/APO-SI20/'
+export const APO_SI20_PO = APO_SI20_PRAEFIX + '5-10'
 
 const SCHILD_KUERZEL: Record<AbschlussTyp, string> = {
   OA: 'OA',
@@ -32,6 +34,11 @@ export const ABSCHLUSS_SPEICHERN = false
 
 export function istApoSI20(pruefungsOrdnung: string | null | undefined): boolean {
   return !!pruefungsOrdnung && pruefungsOrdnung.includes('/APO-SI20/')
+}
+
+// Sonderpädagogische Förderung (z.B. S/AOSF-SI05/5-10): wird von Prognos nicht überschrieben
+export function istAOSF(pruefungsOrdnung: string | null | undefined): boolean {
+  return !!pruefungsOrdnung && pruefungsOrdnung.includes('/AOSF')
 }
 
 // Wert für das Feld 'abschluss' der Lernabschnittsdaten (PM2: PMAbschlusstoSchILDAbschluss)

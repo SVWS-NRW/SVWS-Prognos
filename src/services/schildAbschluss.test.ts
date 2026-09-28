@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { abschlussZuSchild, abschlussartZuSchild, istApoSI20, schildZuAbschluss } from './schildAbschluss'
+import { abschlussZuSchild, abschlussartZuSchild, istAOSF, istApoSI20, schildZuAbschluss } from './schildAbschluss'
 
 describe('Abschluss → Schild-NRW', () => {
   it('Kürzel wie in Prueford_Optionen (OP_Krz)', () => {
@@ -40,5 +40,13 @@ describe('Schild-NRW → Abschluss', () => {
     expect(istApoSI20('GE/APO-SI20/5-10')).toBe(true)
     expect(istApoSI20('GE/APO-SI05/5-10')).toBe(false)
     expect(istApoSI20(null)).toBe(false)
+  })
+})
+
+describe('istAOSF', () => {
+  it('erkennt AOSF-Prüfungsordnungen', () => {
+    expect(istAOSF('S/AOSF-SI05/5-10')).toBe(true)
+    expect(istAOSF('GE/APO-SI20/5-10')).toBe(false)
+    expect(istAOSF(null)).toBe(false)
   })
 })

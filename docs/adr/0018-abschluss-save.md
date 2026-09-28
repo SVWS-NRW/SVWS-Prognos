@@ -106,7 +106,20 @@ Zuordnung zentral in `services/schildAbschluss.ts`:
 | `noteLernbereichNW` | nur bei Änderung | `Gesamtnote_NW` |
 
 - Die Kürzel entsprechen `OP_Krz` aus `/schild3/pruefungsordnungen/optionen`. Gesamt-,
-  Sekundar- und Primusschule nutzen alle die Prüfungsordnung `GE/APO-SI20/5-10`.
+  Sekundar- und Primusschule nutzen alle die Prüfungsordnung `GE/APO-SI20/5-10`. Die Schulform
+  steht nicht im Kürzel, sondern in `PO_Schulform` (`/schild3/pruefungsordnungen`) bzw.
+  `OP_Schulformen` (`/schild3/pruefungsordnungen/optionen`). Das Schulform-Kürzel der
+  Primusschule ist `PS`.
+- `loadPruefungsordnungen()` liest `PO_Krz`/`PO_Name` und filtert auf `PO_Schulform` der Schule,
+  weil der Katalog die Prüfungsordnungen aller Schulformen enthält.
+- Zur Auswahl steht nur APO-SI20, weil nur sie für die Jahrgänge 8–10 noch gültig ist und nur sie
+  von der Engine berechnet wird. Andere Prüfungsordnungen der Schulform (APO-SI05, AOSF-SI05,
+  AO-SI99 …) werden mit anderen Programmen berechnet. Beim Laden wird APO-SI20 vorausgewählt.
+- Ausnahme AOSF (sonderpädagogische Förderung, z.B. `S/AOSF-SI05/5-10`): Eine gespeicherte
+  AOSF-Prüfungsordnung bleibt ausgewählt, das Dropdown ist gesperrt, und Abschluss, Abschlussart
+  und Protokoll werden nicht geschrieben. Ob eine Prognose bei Förderbedarf sinnvoll ist, ist offen.
+  Kommt eine neue APO-SI hinzu, muss sie hier angeboten werden (neues Regelwerk in der Engine,
+  `apoSI20Option`/`poOptionen` in `PrognoseView` und `istApoSI20()` in `schildAbschluss.ts` erweitern).
 - **Derzeit abgeschaltet** (`ABSCHLUSS_SPEICHERN = false`): Der SVWS-Server lehnt beim PATCH
   jedes `abschluss` ab, das nicht im ASD-Katalog `SchulabschlussAllgemeinbildend` steht
   (409 CONFLICT), also auch alle Schild-Kürzel. `abschlussart` und das Protokoll werden

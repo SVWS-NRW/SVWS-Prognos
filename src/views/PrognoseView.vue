@@ -85,6 +85,7 @@
               size="small"
               show-clear
               placeholder="–"
+              :disabled="istAOSFSchueler"
               class="po-select"
             />
           </div>
@@ -96,7 +97,11 @@
             <Checkbox v-model="istAbschlussPrognose" :binary="true" input-id="ist-prog-chk" />
             <label for="ist-prog-chk" class="abschluss-label">Ist Prognose</label>
           </div>
-          <div v-if="!ABSCHLUSS_SPEICHERN" class="abschluss-hinweis">
+          <div v-if="istAOSFSchueler" class="abschluss-hinweis">
+            Prüfungsordnung AOSF (sonderpädagogische Förderung): Prognos überschreibt weder
+            Prüfungsordnung noch Abschluss
+          </div>
+          <div v-else-if="!ABSCHLUSS_SPEICHERN" class="abschluss-hinweis">
             Abschluss wird vorerst nicht gespeichert (Korrektur im SVWS-Server ausstehend)
           </div>
           <div v-else-if="!abschlussWirdGespeichert" class="abschluss-hinweis">
@@ -322,7 +327,7 @@ import {
 } from '@/services/svwsService'
 import type { SvwsPruefungsordnung } from '@/services/svwsService'
 import { ordneRechenKuerzelZu } from '@/services/prognoseEingabe'
-import { ABSCHLUSS_KURZ, ABSCHLUSS_SPEICHERN, abschlussZuSchild, abschlussartZuSchild, istApoSI20 } from '@/services/schildAbschluss'
+import { ABSCHLUSS_KURZ, ABSCHLUSS_SPEICHERN, APO_SI20_PO, abschlussZuSchild, abschlussartZuSchild, istAOSF, istApoSI20 } from '@/services/schildAbschluss'
 import type { FachDaten } from '@/models/Fach'
 import type { SvwsLernabschnittsdaten } from '@/models/Lernabschnitt'
 import ThemeToggle from '@/components/ThemeToggle.vue'
@@ -372,10 +377,6 @@ const kursartWarnungNichtMehrZeigen = ref(false)
 const kursartWarnungUnterdrückt = ref(false)
 const pendingNavigate = ref<(() => void) | null>(null)
 
-const SCHULFORM_KUERZEL: Record<string, string> = {
-  GESAMTSCHULE: 'GE', SEKUNDARSCHULE: 'SK', PRIMUSSCHULE: 'PR',
-}
-
 const berechneterAbschlussCode = computed(() =>
   ergebnis.value ? abschlussZuSchild(ergebnis.value.empfehlung) : null
 )
@@ -393,24 +394,21 @@ const abschlussGeaendert = computed(() => {
     : abschlussartZuSchild(ergebnis.value.empfehlung) !== (la?.abschlussart ?? null)
 })
 
-// Eindeutige PO-Namen aus der API (z.B. "APO-SI20" aus "GE/APO-SI20/5-10")
+// Nur APO-SI20 anbieten: Nur sie ist für Jg. 8–10 noch gültig und nur sie berechnet die Engine.
+// Andere Prüfungsordnungen der Schulform werden mit anderen Programmen berechnet.
+const apoSI20Option = computed(() => {
+  const po = pruefungsordnungen.value.find(p => istApoSI20(p.pruefungsOrdnung))
+  return { value: po?.pruefungsOrdnung ?? APO_SI20_PO, label: po?.bezeichnung ?? 'APO-SI20' }
+})
+
+// Gespeicherte AOSF-Prüfungsordnung bleibt erhalten: Ob eine Prognose bei Förderbedarf
+// sinnvoll ist, ist offen, daher wird sie nicht durch APO-SI20 ersetzt.
+const istAOSFSchueler = computed(() => istAOSF(rawLernabschnitt.value?.pruefungsOrdnung))
 const poOptionen = computed(() => {
-  const seen = new Set<string>()
-  const opts: { value: string; label: string }[] = []
-  for (const po of pruefungsordnungen.value) {
-    const parts = po.pruefungsOrdnung.split('/')
-    const poName = parts[1] ?? po.pruefungsOrdnung
-    if (!seen.has(po.pruefungsOrdnung)) {
-      seen.add(po.pruefungsOrdnung)
-      const label = po.bezeichnung ? `${poName} – ${po.bezeichnung}` : poName
-      opts.push({ value: po.pruefungsOrdnung, label })
-    }
-  }
-  if (!opts.find(o => o.value.includes('APO-SI20'))) {
-    const sfKuerzel = SCHULFORM_KUERZEL[schulform.value] ?? 'GE'
-    opts.unshift({ value: `${sfKuerzel}/APO-SI20/5-10`, label: 'APO-SI20' })
-  }
-  return opts
+  const gespeichertePO = rawLernabschnitt.value?.pruefungsOrdnung
+  if (!istAOSFSchueler.value || !gespeichertePO) return [apoSI20Option.value]
+  const po = pruefungsordnungen.value.find(p => p.pruefungsOrdnung === gespeichertePO)
+  return [{ value: gespeichertePO, label: po?.bezeichnung ?? gespeichertePO }, apoSI20Option.value]
 })
 
 
@@ -560,7 +558,7 @@ async function laden(abschnittIdParam?: number) {
     const [lernabschnitt] = await Promise.all([
       loadSvwsLernabschnittsdaten(schuelerId.value, abschnittId),
       pruefungsordnungen.value.length === 0
-        ? loadPruefungsordnungen().then(pos => { pruefungsordnungen.value = pos })
+        ? loadPruefungsordnungen(authStore.schulformKuerzel).then(pos => { pruefungsordnungen.value = pos })
         : Promise.resolve(),
     ])
     rawLernabschnitt.value = lernabschnitt
@@ -569,21 +567,10 @@ async function laden(abschnittIdParam?: number) {
     const schueler = schuelerStore.schueler.find(s => s.id === schuelerId.value)
     jahrgang.value = schueler?.jahrgang ?? null
 
-    // Prüfungsordnung: APO-SI20 als Default; gespeicherten Wert nur übernehmen wenn
-    // er einer bekannten Option entspricht (verhindert leeres Dropdown bei alten Formaten)
-    {
-      const sfKuerzel = SCHULFORM_KUERZEL[schulform.value] ?? 'GE'
-      const apoOption = pruefungsordnungen.value.find(po =>
-        po.pruefungsOrdnung.startsWith(`${sfKuerzel}/APO-SI20/`)
-      )?.pruefungsOrdnung ?? `${sfKuerzel}/APO-SI20/5-10`
-
-      const gespeichertePO = lernabschnitt.pruefungsOrdnung
-      const gespeicherteGueltig = !!gespeichertePO && (
-        gespeichertePO === apoOption ||
-        pruefungsordnungen.value.some(po => po.pruefungsOrdnung === gespeichertePO)
-      )
-      selectedPO.value = gespeicherteGueltig ? gespeichertePO : apoOption
-    }
+    // Prüfungsordnung: APO-SI20, da nur diese angeboten und berechnet wird; AOSF bleibt stehen
+    selectedPO.value = istAOSF(lernabschnitt.pruefungsOrdnung)
+      ? lernabschnitt.pruefungsOrdnung
+      : apoSI20Option.value.value
 
     // IstAbschlussPrognose: gespeicherten Wert nehmen oder Default berechnen
     if (lernabschnitt.istAbschlussPrognose !== null) {

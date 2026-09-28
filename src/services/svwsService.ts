@@ -116,19 +116,20 @@ export async function loadSvwsLernabschnittsdaten(
 export interface SvwsPruefungsordnung {
   // Voller Identifier, z.B. "GE/APO-SI20/5-10"
   pruefungsOrdnung: string
-  // Abschluss-Code für diesen Eintrag, z.B. "MSA-Q"
-  abschluss: string | null
   bezeichnung: string | null
 }
 
-export async function loadPruefungsordnungen(): Promise<SvwsPruefungsordnung[]> {
+// Der Katalog enthält die Prüfungsordnungen aller Schulformen. Die Schulform steht in
+// PO_Schulform (z.B. "GE", "SK", "PS"); GE, SK und PS teilen sich dasselbe PO_Krz.
+export async function loadPruefungsordnungen(schulformKuerzel: string): Promise<SvwsPruefungsordnung[]> {
   try {
     const { data } = await getApiClient().get('/schild3/pruefungsordnungen')
-    return (Array.isArray(data) ? data : []).map((po: any) => ({
-      pruefungsOrdnung: String(po.pruefungsOrdnung ?? po.kuerzel ?? po.id ?? ''),
-      abschluss: po.abschluss ? String(po.abschluss) : null,
-      bezeichnung: po.bezeichnung ?? po.text ?? null,
-    }))
+    return (Array.isArray(data) ? data : [])
+      .filter((po: any) => po?.PO_Schulform === schulformKuerzel && po.PO_Krz)
+      .map((po: any) => ({
+        pruefungsOrdnung: String(po.PO_Krz),
+        bezeichnung: po.PO_Name ?? null,
+      }))
   } catch {
     return []
   }
