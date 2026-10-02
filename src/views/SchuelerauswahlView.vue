@@ -155,9 +155,6 @@ const statusOptionen = [
   { label: 'Aktiv',                  value: 2 },
   { label: 'Beurlaubt',              value: 3 },
   { label: 'Extern',                 value: 6 },
-  { label: 'Abschluss',              value: 8 },
-  { label: 'Abgang (ohne Abschluss)', value: 9 },
-  { label: 'Ehemalige',              value: 10 },
 ]
 
 const klassenOptionen = computed(() =>

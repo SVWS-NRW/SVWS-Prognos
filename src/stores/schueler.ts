@@ -10,6 +10,10 @@ import type { SvwsLernabschnittsdaten } from '@/models/Lernabschnitt'
 // keinen Sammel-Endpunkt)
 const PARALLEL = 10
 
+// Status 8 (Abschluss), 9 (Abgang) und 10 (Ehemalige): für Prognosen nicht relevant, in großen
+// Schulen aber der Großteil der Auswahlliste
+const AUSGEBLENDETE_STATUS = [8, 9, 10]
+
 type AbschlussInfo = Pick<Schueler, 'svwsAbschluss' | 'svwsIstAbschlussPrognose' | 'svwsPruefungsOrdnung'>
 
 export const useSchuelerStore = defineStore('schueler', () => {
@@ -50,9 +54,9 @@ export const useSchuelerStore = defineStore('schueler', () => {
       }
       if (neu) abschlussCache.delete(abschnittId)
 
-      const gefilterteSchueler = jahrgangFilter
-        ? liste.schueler.filter(s => normalisiereJahrgang(s.jahrgang) === jahrgangFilter)
-        : liste.schueler
+      const gefilterteSchueler = liste.schueler
+        .filter(s => s.status === null || !AUSGEBLENDETE_STATUS.includes(s.status))
+        .filter(s => !jahrgangFilter || normalisiereJahrgang(s.jahrgang) === jahrgangFilter)
 
       const relevanteKlassenIds = new Set(gefilterteSchueler.map(s => s.idKlasse))
       const relevanteKlassen = liste.klassen.filter(k => relevanteKlassenIds.has(k.id))
