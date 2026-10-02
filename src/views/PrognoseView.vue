@@ -11,7 +11,7 @@
         @click="pruefeUndNavigiere(() => router.push({ name: 'jahrgang', params: { jg: jahrgang ?? '' } }))"
       />
       <Button icon="pi pi-arrow-left" text size="small" @click="pruefeUndNavigiere(() => router.back())" />
-      <span class="toolbar-title">{{ schuelerName }}<span v-if="schuelerKlasse" class="toolbar-klasse"> · {{ schuelerKlasse }}</span></span>
+      <span class="toolbar-title">{{ schuelerName }}<span v-if="schuelerKlasse" class="toolbar-klasse"> · {{ schuelerKlasse }}</span><span class="toolbar-klasse" title="ID des Schülerdatensatzes"> · ID {{ schuelerId }}</span></span>
       <Button
         v-if="naechsterSchueler"
         icon="pi pi-arrow-right"
@@ -586,14 +586,10 @@ async function laden(abschnittIdParam?: number) {
       ? lernabschnitt.pruefungsOrdnung
       : apoSI20Option.value.value
 
-    // IstAbschlussPrognose: gespeicherten Wert nehmen oder Default berechnen
-    if (lernabschnitt.istAbschlussPrognose !== null) {
-      istAbschlussPrognose.value = lernabschnitt.istAbschlussPrognose
-    } else {
-      const jgNum = Number(jahrgang.value)
-      const abschnittNr = abschnittStore.abschnitte.find(a => a.id === abschnittId)?.abschnitt
-      istAbschlussPrognose.value = jgNum < 10 || (jgNum === 10 && abschnittNr === 1)
-    }
+    // Ist Prognose: immer, außer Jg. 10 im 2. Halbjahr — dort ist der berechnete Abschluss der
+    // tatsächliche. Gilt auch, wenn ein anderer Wert gespeichert ist; manuell weiter änderbar.
+    const abschnittNr = abschnittStore.abschnitte.find(a => a.id === abschnittId)?.abschnitt
+    istAbschlussPrognose.value = !(Number(jahrgang.value) === 10 && abschnittNr === 2)
 
     const belegungen = lernabschnitt.leistungsdaten
       .map(ld => ({ ld, fach: faecherStore.faecherMap.get(ld.fachID) }))
@@ -683,7 +679,8 @@ async function doSpeichern() {
       const felder = abschlussFelder(ergebnis.value.empfehlung)
       const antwort = await patchAbschlussdaten(rawLernabschnitt.value.id, felder)
       const idFeld = notenModus.value === 'quartal' ? 'idAbschlussQuartalsprognose' : 'idAbschluss'
-      if (antwort && antwort[idFeld] !== felder[idFeld]) {
+      // Eine im Schuljahr ungültige ID setzt der Server ohne Fehler auf null
+      if (antwort[idFeld] !== felder[idFeld]) {
         throw new Error(`Der SVWS-Server hat den Abschluss ${ABSCHLUSS_KURZ[ergebnis.value.empfehlung]} nicht übernommen.`)
       }
     }

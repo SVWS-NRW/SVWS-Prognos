@@ -102,7 +102,7 @@ Die Konvertierung zwischen PM2-Kürzeln und SchILD-Feldwerten übernimmt
 | SVWS-Feld | Endpunkt | Wert | PM2/SchILD-Entsprechung |
 |---|---|---|---|
 | `pruefungsOrdnung` | 1 | gewählte Prüfungsordnung (`GE/APO-SI20/5-10`) | – |
-| `istAbschlussPrognose` | 1 | Checkbox „Ist Prognose“ | `AbschlIstPrognose` |
+| `istAbschlussPrognose` | 1 | Checkbox „Ist Prognose“: beim Laden gesetzt, außer Jg. 10 im 2. Halbjahr (dann tatsächlicher Abschluss); gespeicherter Wert wird nicht übernommen, manuell änderbar | `AbschlIstPrognose` |
 | `noteLernbereichNW` | 1 | nur bei Änderung | `Gesamtnote_NW` |
 | `idAbschluss` | 2 | Katalog-ID: OA `0` · ESA `2001` · EESA `5001` · MSA `10000` · MSA-Q `11000` | `Abschluss` |
 | `idAbschlussart` | 2 | `1` = Abschluss erreicht, `2` = ohne Abschluss (OA) | `AbschlussArt` |
@@ -117,14 +117,17 @@ Die Konvertierung zwischen PM2-Kürzeln und SchILD-Feldwerten übernimmt
   (`GE/APO-SI20/OA` · `/ESA` · `/EESA` · `/MSA` · `/MSAQ-E`) und setzt auch `abschlussart`.
   Gelesen wird der gespeicherte Abschluss für Schülertabelle und Auswertungen weiter aus
   `abschluss` über `schildZuAbschluss()`.
+- Prüfungsordnung: Der neue Endpunkt arbeitet bewusst mit der Kurzform (`APO-SI20`) und lehnt
+  die Langform `GE/APO-SI20/5-10` mit 400 ab. In der Datenbank speichert der Server weiterhin
+  Schild3-kompatibel (Langform in den Lernabschnittsdaten). Prognos setzt die Prüfungsordnung
+  vorerst über Schritt 1 und sendet sie am neuen Endpunkt nicht mit.
+- Geplant: Umstieg auf eine atomarere Speicherung, d.h. Prüfungsordnung (Kurzform), Prognose-Flag
+  und Abschluss in einem PATCH über `/abschluesse/…` statt zwei getrennter Aufrufe.
 - Verhalten des Servers (getestet gegen `1.5.0-SNAPSHOT`, Oktober 2026):
-  - `pruefungsordnung` erwartet am neuen Endpunkt die Kurzform (`APO-SI20`); die Langform
-    `GE/APO-SI20/5-10` wird mit 400 abgelehnt. Prognos sendet sie dort daher nicht mit.
+  - Der PATCH antwortet mit 200 und den gespeicherten `Abschlussdaten`.
   - Eine im Schuljahr ungültige `idAbschluss` wird ohne Fehler auf `null` gesetzt. Prognos
-    vergleicht deshalb die Antwort des PATCH (200 mit `Abschlussdaten`, laut Spec 204) mit dem
-    gesendeten Wert und meldet sonst einen Fehler.
-  - `idAbschluss: null` bzw. `idAbschlussQuartalsprognose: null` führen zu 500. Prognos sendet
-    keine `null`-Werte; ein Abschluss lässt sich über die API derzeit nicht entfernen.
+    vergleicht deshalb die Antwort des PATCH mit dem gesendeten Wert und meldet sonst einen Fehler.
+  - `null` leert ein Feld (anfangs führte das zu 500, inzwischen im Server behoben).
 - Die Kürzel entsprechen `OP_Krz` aus `/schild3/pruefungsordnungen/optionen`. Gesamt-,
   Sekundar- und Primusschule nutzen alle die Prüfungsordnung `GE/APO-SI20/5-10`. Die Schulform
   steht nicht im Kürzel, sondern in `PO_Schulform` (`/schild3/pruefungsordnungen`) bzw.

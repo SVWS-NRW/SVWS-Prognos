@@ -140,8 +140,15 @@
           "required" : true
         },
         "responses" : {
-          "204" : {
-            "description" : "Der Patch wurde erfolgreich integriert."
+          "200" : {
+            "description" : "Der Patch wurde erfolgreich integriert.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Abschlussdaten"
+                }
+              }
+            }
           },
           "400" : {
             "description" : "Der Patch ist fehlerhaft aufgebaut."
@@ -44020,7 +44027,7 @@
             "$ref" : "#/components/schemas/JsonNullableString"
           }
         },
-        "description" : "Die Zuordnung eines Unterrichtsfachs zu einer Lehrkraft."
+        "description" : "Der Patch für Informationen zu dem Abschluss in einem Lernabschnitt eines Schülers."
       },
       "JsonNullableBoolean" : {
         "type" : "object",

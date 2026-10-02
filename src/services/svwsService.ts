@@ -162,16 +162,14 @@ export async function loadAbschlussdaten(lernabschnittId: number): Promise<SvwsA
 }
 
 // Schreibt die Abschlussfelder; der Server setzt daraus u.a. 'abschluss' (Schild-Kürzel) und
-// 'abschlussart' der Lernabschnittsdaten. 'pruefungsordnung' erwartet hier die Kurzform
-// ('APO-SI20') und wird daher weiter über patchLernabschnittsdaten() gesetzt.
-// null-Werte nicht senden: Der Server antwortet bei idAbschluss = null mit 500.
+// 'abschlussart' der Lernabschnittsdaten. 'pruefungsordnung' erwartet hier bewusst die Kurzform
+// ('APO-SI20'); sie wird vorerst weiter in Langform über patchLernabschnittsdaten() gesetzt.
 export async function patchAbschlussdaten(
   lernabschnittId: number,
   felder: Partial<Omit<SvwsAbschlussdaten, 'idLernabschnitt' | 'pruefungsordnung'>>,
-): Promise<SvwsAbschlussdaten | null> {
-  const body = Object.fromEntries(Object.entries(felder).filter(([, v]) => v !== null && v !== undefined))
-  const { data } = await getApiClient().patch(`/abschluesse/schueler/lernabschnittsdaten/${lernabschnittId}`, body)
-  return data ? mapAbschlussdaten(data) : null
+): Promise<SvwsAbschlussdaten> {
+  const { data } = await getApiClient().patch(`/abschluesse/schueler/lernabschnittsdaten/${lernabschnittId}`, felder)
+  return mapAbschlussdaten(data)
 }
 
 export async function patchLeistungsdaten(

@@ -371,5 +371,7 @@ npm run build        # Produktions-Build nach dist/
    (Prüfungsordnung in Langform `GE/APO-SI20/5-10`, Prognose-Flag, LBNW), dann
    `/abschluesse/schueler/lernabschnittsdaten/{id}` mit `idAbschluss` (Katalog-ID, kein Kürzel).
    Mit Quartalsnoten gerechnet → `idAbschlussQuartalsprognose`/`textErgebniseQuartalsprognose`.
-   Server-Eigenheiten: Langform der PO am neuen Endpunkt → 400; ungültige ID → still `null`
-   (daher Antwort prüfen); `null` für `idAbschluss`/`idAbschlussQuartalsprognose` → 500.
+   Der neue Endpunkt nimmt die PO bewusst nur in Kurzform (`APO-SI20`, Langform → 400); die DB
+   bleibt Schild3-kompatibel. Geplant: später atomar in einem PATCH über `/abschluesse/…`.
+   Server-Eigenheit: ungültige ID → still `null`
+   (daher Antwort des PATCH prüfen, 200 mit `Abschlussdaten`).
