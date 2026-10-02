@@ -884,6 +884,8 @@ function mapKursart(k: string | null): 'E' | 'G' | 'Sonstige' {
 .w-kuerzel  { width: 5rem; }
 .w-bez      { width: 100%; min-width: 6rem; }
 .w-note     { width: 4rem; }
+/* Bei 4rem bleiben neben Pfeil und Innenabstand nur 2px für die Note; Chromium kürzt sie dann zu "5…" */
+.w-note :deep(.p-select-label) { padding-inline-end: 0; }
 .w-kursart  { width: 7rem; }
 
 .empty-hint {
