@@ -34,6 +34,27 @@ npm run build      # Statisches Bundle → dist/
 npm run release    # AppImage + NSIS-Installer + Web-ZIP → release/
 ```
 
+## SVWS-Schnittstelle (OpenAPI + Kataloge)
+
+Unter [data/openAPI/](data/openAPI/) liegen Snapshots der Schnittstelle des SVWS-Servers, gegen
+die SVWS-Prognos entwickelt wird:
+
+| Datei | Inhalt | Aktuelle Version abrufen |
+|---|---|---|
+| `server.json` | OpenAPI-3-Beschreibung aller REST-Endpunkte und Schemas | `https://localhost:8443/openapi/server.json` |
+| `allinone.json` | Alle ASD-/Core-Types-Kataloge (z. B. `SchulabschlussAllgemeinbildend`, `ZulaessigeKursart`, `Fach`, `Schulform`) | `https://localhost:8443/types/allinone.json` |
+
+Aktualisieren gegen einen lokal laufenden SVWS-Server (selbstsigniertes Zertifikat → `-k`):
+
+```bash
+curl -k -o data/openAPI/server.json    https://localhost:8443/openapi/server.json
+curl -k -o data/openAPI/allinone.json  https://localhost:8443/types/allinone.json
+git diff --stat data/openAPI/          # Änderungen an API/Katalogen sichtbar machen
+```
+
+Beide Dateien werden eingecheckt, damit Änderungen am SVWS-Server (neue/geänderte Endpunkte,
+Katalogeinträge, Versionen) über `git diff` nachvollziehbar sind.
+
 ## Verwandte Projekte
 
 * [SVWS-Import](https://github.com/SVWS-NRW/SVWS-Import) — gleiche technische Basis, Daten in SVWS importieren
