@@ -1,3 +1,4 @@
+import { isAxiosError } from 'axios'
 import { getApiClient } from './apiClient'
 import type { Schulstammdaten, SvwsSchuelerListeEintrag, SvwsKlasse, Klasse, Schueler } from '@/models/Schueler'
 import type { NotenbildSchueler } from '@/models/Lernabschnitt'
@@ -156,9 +157,22 @@ function mapAbschlussdaten(data: any): SvwsAbschlussdaten {
   }
 }
 
-export async function loadAbschlussdaten(lernabschnittId: number): Promise<SvwsAbschlussdaten> {
-  const { data } = await getApiClient().get(`/abschluesse/schueler/lernabschnittsdaten/${lernabschnittId}`)
-  return mapAbschlussdaten(data)
+// 400 = Abschlussberechnung für diesen Lernabschnitt nicht unterstützt (z.B. Jg. 8:
+// "Für den Jahrgang wird die Abschlussberechnung aktuell nicht unterstützt."). Dann kommt
+// statt der Daten der Grund zurück; auch der PATCH wird in diesem Fall abgelehnt.
+export async function loadAbschlussdaten(
+  lernabschnittId: number,
+): Promise<{ daten: SvwsAbschlussdaten; nichtUnterstuetzt: null } | { daten: null; nichtUnterstuetzt: string }> {
+  try {
+    const { data } = await getApiClient().get(`/abschluesse/schueler/lernabschnittsdaten/${lernabschnittId}`)
+    return { daten: mapAbschlussdaten(data), nichtUnterstuetzt: null }
+  } catch (e) {
+    if (!isAxiosError(e) || e.response?.status !== 400) throw e
+    const grund = typeof e.response.data === 'string' && e.response.data.trim() !== ''
+      ? e.response.data.trim()
+      : 'Der SVWS-Server unterstützt die Abschlussberechnung für diesen Lernabschnitt nicht.'
+    return { daten: null, nichtUnterstuetzt: grund }
+  }
 }
 
 // Schreibt die Abschlussfelder; der Server setzt daraus u.a. 'abschluss' (Schild-Kürzel) und

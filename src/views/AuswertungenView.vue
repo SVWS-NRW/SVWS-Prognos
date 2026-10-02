@@ -58,7 +58,13 @@
                     <tr class="tr-jahrgang">
                       <td colspan="8">Jahrgang {{ gruppe.jahrgang }}</td>
                     </tr>
-                    <tr v-for="zeile in gruppe.zeilen" :key="zeile.klasseKuerzel" class="tr-klasse">
+                    <tr
+                      v-for="zeile in gruppe.zeilen"
+                      :key="zeile.klasseKuerzel"
+                      class="tr-klasse"
+                      :title="`Schülerliste der Klasse ${zeile.klasseKuerzel}`"
+                      @click="navigiereZurKlasse(gruppe.jahrgang, zeile.klasseId)"
+                    >
                       <td class="td-klasse">{{ zeile.klasseKuerzel }}</td>
                       <td class="td-num" :class="{ 'num-kritisch': zeile.oa > 0 }">{{ zeile.oa || '–' }}</td>
                       <td class="td-num" :class="{ 'num-warn': zeile.esa > 0 }">{{ zeile.esa || '–' }}</td>
@@ -222,8 +228,8 @@ const aktiverTab = ref('verteilung')
 const selectedAbschnittId = ref<number | null>(abschnittStore.ausgewaehltId)
 
 // Spaltenbreiten: Nachname, Vorname, Klasse, Jg., [Abschluss]
-const spaltenBreitenRisiko = ref([150, 130, 85, 50, 110])
-const spaltenBreitenOffen = ref([150, 130, 85, 50])
+const spaltenBreitenRisiko = ref([240, 200, 110, 70, 140])
+const spaltenBreitenOffen = ref([240, 200, 110, 70])
 
 type TabelleId = 'risiko' | 'offen'
 interface ResizeState { tabelle: TabelleId; colIdx: number; startX: number; startWidth: number }
@@ -282,6 +288,7 @@ function abschlussZuSeverity(svwsAbschluss: string | null | undefined): 'danger'
 
 interface KlassenZeile {
   klasseKuerzel: string
+  klasseId: number | null
   oa: number; esa: number; eesa: number; msa: number; msaQ: number; offen: number; gesamt: number
 }
 
@@ -291,7 +298,7 @@ interface JahrgangGruppe {
   summe: KlassenZeile
 }
 
-function zaehleKategorien(liste: typeof schuelerStore.schueler): Omit<KlassenZeile, 'klasseKuerzel'> {
+function zaehleKategorien(liste: typeof schuelerStore.schueler): Omit<KlassenZeile, 'klasseKuerzel' | 'klasseId'> {
   let oa = 0, esa = 0, eesa = 0, msa = 0, msaQ = 0, offen = 0
   for (const s of liste) {
     const kat = svwsZuKat(s.svwsAbschluss)
@@ -313,11 +320,11 @@ const verteilungNachJahrgang = computed((): JahrgangGruppe[] => {
   return jahrgaenge.map(jg => {
     const imJg = geladen.filter(s => s.jahrgang === jg)
     const klassen = [...new Set(imJg.map(s => s.klasseKuerzel))].sort()
-    const zeilen: KlassenZeile[] = klassen.map(kl => ({
-      klasseKuerzel: kl,
-      ...zaehleKategorien(imJg.filter(s => s.klasseKuerzel === kl)),
-    }))
-    return { jahrgang: jg, zeilen, summe: { klasseKuerzel: '', ...zaehleKategorien(imJg) } }
+    const zeilen: KlassenZeile[] = klassen.map(kl => {
+      const inKlasse = imJg.filter(s => s.klasseKuerzel === kl)
+      return { klasseKuerzel: kl, klasseId: inKlasse[0]?.klasseId ?? null, ...zaehleKategorien(inKlasse) }
+    })
+    return { jahrgang: jg, zeilen, summe: { klasseKuerzel: '', klasseId: null, ...zaehleKategorien(imJg) } }
   })
 })
 
@@ -359,6 +366,15 @@ const offenePrognosen = computed(() =>
 // ---------------------------------------------------------------------------
 // Navigation
 // ---------------------------------------------------------------------------
+
+// Statusfilter 'alle', weil die Verteilung Schüler aller Status zählt
+function navigiereZurKlasse(jahrgang: string, klasseId: number | null) {
+  router.push({
+    name: 'jahrgang',
+    params: { jg: jahrgang },
+    query: { ...(klasseId !== null ? { klasse: String(klasseId) } : {}), status: 'alle' },
+  })
+}
 
 function navigiereZurPrognose(schuelerId: number) {
   schuelerStore.waehleSchueler(schuelerId)
@@ -419,7 +435,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 0.5rem;
 }
-.toolbar-title { font-size: 0.9rem; font-weight: 600; }
+.toolbar-title { font-size: 1.05rem; font-weight: 600; }
 .toolbar-sep { flex: 1; }
 .abschnitt-select { width: 16rem; }
 
@@ -439,6 +455,10 @@ onUnmounted(() => {
   min-height: 0;
   display: grid;
   grid-template-rows: auto 1fr;
+}
+
+:deep(.p-tab) {
+  font-size: 1rem;
 }
 
 :deep(.p-tabpanels) {
@@ -476,14 +496,14 @@ onUnmounted(() => {
 .auswertung-table {
   border-collapse: separate;
   border-spacing: 0;
-  font-size: 0.8rem;
+  font-size: 1rem;
   width: 100%;
 }
 
 .auswertung-table th {
   text-align: left;
-  padding: 0.3rem 0.75rem;
-  font-size: 0.72rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
   font-weight: 500;
   color: var(--p-text-muted-color);
   border-bottom: 1px solid var(--p-content-border-color);
@@ -495,12 +515,12 @@ onUnmounted(() => {
 }
 
 .auswertung-table td {
-  padding: 0.4rem 0.75rem;
+  padding: 0.6rem 1rem;
   border-bottom: 1px solid var(--p-content-border-color);
   vertical-align: middle;
 }
 
-.th-num { text-align: right; }
+.auswertung-table th.th-num { text-align: right; }
 .td-num { text-align: right; font-variant-numeric: tabular-nums; }
 .td-gesamt { font-weight: 600; }
 .td-offen { color: var(--p-text-muted-color); }
@@ -510,21 +530,22 @@ onUnmounted(() => {
 /* Jahrgangs-Trenner */
 .tr-jahrgang td {
   font-weight: 600;
-  font-size: 0.72rem;
+  font-size: 0.85rem;
   color: var(--p-text-muted-color);
   background: var(--p-highlight-background);
-  padding: 0.25rem 0.75rem;
+  padding: 0.4rem 1rem;
 }
 
 /* Summenzeil */
 .tr-summe td {
   font-weight: 600;
-  font-size: 0.75rem;
+  font-size: 0.9rem;
   color: var(--p-text-muted-color);
   border-top: 2px solid var(--p-content-border-color);
   background: var(--p-highlight-background);
 }
 
+.tr-klasse { cursor: pointer; }
 .tr-klasse:hover { background: var(--p-highlight-background); }
 .tr-klasse:last-child td { border-bottom: none; }
 
@@ -537,7 +558,7 @@ onUnmounted(() => {
 .td-klasse { color: var(--p-text-muted-color); }
 .td-muted { color: var(--p-text-muted-color); }
 .td-action { text-align: left; }
-.action-icon { font-size: 0.7rem; color: var(--p-text-muted-color); }
+.action-icon { font-size: 0.85rem; color: var(--p-text-muted-color); }
 
 .td-empty {
   text-align: center;
@@ -578,8 +599,8 @@ onUnmounted(() => {
 .sh-cell {
   flex-shrink: 0;
   position: relative;
-  padding: 0.3rem 0.75rem;
-  font-size: 0.72rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
   font-weight: 500;
   color: var(--p-text-muted-color);
   white-space: nowrap;

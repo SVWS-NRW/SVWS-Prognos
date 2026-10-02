@@ -375,3 +375,5 @@ npm run build        # Produktions-Build nach dist/
    bleibt Schild3-kompatibel. Geplant: später atomar in einem PATCH über `/abschluesse/…`.
    Server-Eigenheit: ungültige ID → still `null`
    (daher Antwort des PATCH prüfen, 200 mit `Abschlussdaten`).
+   Jg. 8: GET/PATCH → 400 „Abschlussberechnung nicht unterstützt“ — Ansicht lädt trotzdem,
+   Abschluss wird dort nicht gespeichert (`abschlussNichtUnterstuetzt` in PrognoseView).

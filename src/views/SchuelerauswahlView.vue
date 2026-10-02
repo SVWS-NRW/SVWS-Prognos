@@ -133,9 +133,12 @@ const abschnittStore = useSchuljahresabschnittStore()
 
 const laedt = ref(false)
 const fehler = ref<string | null>(null)
-const selectedKlasseId = ref<number | null>(null)
+// Vorbelegung per Query, z.B. beim Sprung aus den Auswertungen: ?klasse=<id>&status=alle
+const selectedKlasseId = ref<number | null>(route.query.klasse ? Number(route.query.klasse) : null)
 const selectedAbschnittId = ref<number | null>(abschnittStore.ausgewaehltId)
-const selectedStatus = ref<number | null>(2)
+// PrimeVue-Select zeigt bei value null kein Label an, daher eigener Wert für 'Alle'
+const STATUS_ALLE = -1
+const selectedStatus = ref<number>(route.query.status === 'alle' ? STATUS_ALLE : 2)
 
 // Spaltenbreiten in px: Nachname, Vorname, Klasse, Abschluss, Prüfungsordnung, ist Prognose
 const spaltenBreiten = ref([240, 200, 110, 140, 180, 130])
@@ -145,7 +148,7 @@ const abschnittOptionen = computed(() =>
 )
 
 const statusOptionen = [
-  { label: 'Alle',                   value: null },
+  { label: 'Alle',                   value: STATUS_ALLE },
   { label: 'Aufnahme',               value: 0 },
   { label: 'Warteliste',             value: 1 },
   { label: 'Aktiv',                  value: 2 },
@@ -165,7 +168,7 @@ const klassenOptionen = computed(() =>
 
 const gefiltert = computed(() => {
   let liste = schuelerStore.schueler
-  if (selectedStatus.value !== null)
+  if (selectedStatus.value !== STATUS_ALLE)
     liste = liste.filter(s => s.status === selectedStatus.value)
   if (selectedKlasseId.value !== null)
     liste = liste.filter(s => s.klasseId === selectedKlasseId.value)

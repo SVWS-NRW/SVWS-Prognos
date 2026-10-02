@@ -101,6 +101,9 @@
             Prüfungsordnung AOSF (sonderpädagogische Förderung): Prognos überschreibt weder
             Prüfungsordnung noch Abschluss
           </div>
+          <div v-else-if="abschlussNichtUnterstuetzt" class="abschluss-hinweis">
+            Abschluss wird nicht gespeichert: {{ abschlussNichtUnterstuetzt }}
+          </div>
           <div v-else-if="!abschlussWirdGespeichert" class="abschluss-hinweis">
             Abschluss wird nur mit Prüfungsordnung APO-SI20 gespeichert
           </div>
@@ -369,6 +372,7 @@ const selectedAbschnittId = ref<number | null>(abschnittStore.ausgewaehltId)
 
 const rawLernabschnitt = ref<SvwsLernabschnittsdaten | null>(null)
 const rawAbschlussdaten = ref<SvwsAbschlussdaten | null>(null)
+const abschlussNichtUnterstuetzt = ref<string | null>(null)
 const pruefungsordnungen = ref<SvwsPruefungsordnung[]>([])
 const selectedPO = ref<string | null>('APO-SI20')
 const istAbschlussPrognose = ref(true)
@@ -387,7 +391,7 @@ const berechneterAbschlussCode = computed(() =>
 const berechneterAbschlussAnzeige = computed(() => berechneterAbschlussCode.value ?? '–')
 
 // Der Abschluss wird nur zusammen mit APO-SI20 gespeichert, weil nur dafür gerechnet wird
-const abschlussWirdGespeichert = computed(() => istApoSI20(selectedPO.value))
+const abschlussWirdGespeichert = computed(() => istApoSI20(selectedPO.value) && !abschlussNichtUnterstuetzt.value)
 
 // Halbjahresnoten → idAbschluss + idAbschlussart, Quartalsnoten → idAbschlussQuartalsprognose
 function abschlussFelder(empfehlung: AbschlussTyp): Partial<SvwsAbschlussdaten> {
@@ -575,7 +579,9 @@ async function laden(abschnittIdParam?: number) {
         : Promise.resolve(),
     ])
     rawLernabschnitt.value = lernabschnitt
-    rawAbschlussdaten.value = await loadAbschlussdaten(lernabschnitt.id)
+    const abschluss = await loadAbschlussdaten(lernabschnitt.id)
+    rawAbschlussdaten.value = abschluss.daten
+    abschlussNichtUnterstuetzt.value = abschluss.nichtUnterstuetzt
     lbnwNote.value = lernabschnitt.noteLernbereichNW
 
     const schueler = schuelerStore.schueler.find(s => s.id === schuelerId.value)

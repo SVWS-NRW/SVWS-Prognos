@@ -128,6 +128,12 @@ Die Konvertierung zwischen PM2-Kürzeln und SchILD-Feldwerten übernimmt
   - Eine im Schuljahr ungültige `idAbschluss` wird ohne Fehler auf `null` gesetzt. Prognos
     vergleicht deshalb die Antwort des PATCH mit dem gesendeten Wert und meldet sonst einen Fehler.
   - `null` leert ein Feld (anfangs führte das zu 500, inzwischen im Server behoben).
+  - Für Jg. 8 lehnt der Server GET und PATCH mit 400 ab („Für den Jahrgang wird die
+    Abschlussberechnung aktuell nicht unterstützt.“). `loadAbschlussdaten()` liefert dann den
+    Grund statt der Daten; die PrognoseView rechnet weiter, zeigt den Grund an und lässt
+    Schritt 2 aus (Noten, Prüfungsordnung und Prognose-Flag werden gespeichert).
+    Entscheidung (Oktober 2026): so belassen. Melden Schulen Bedarf für das Speichern in Jg. 8,
+    muss der SVWS-Server das freischalten; in Prognos ist dafür keine Änderung nötig.
 - Die Kürzel entsprechen `OP_Krz` aus `/schild3/pruefungsordnungen/optionen`. Gesamt-,
   Sekundar- und Primusschule nutzen alle die Prüfungsordnung `GE/APO-SI20/5-10`. Die Schulform
   steht nicht im Kürzel, sondern in `PO_Schulform` (`/schild3/pruefungsordnungen`) bzw.
