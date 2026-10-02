@@ -58,6 +58,11 @@ export function abschlussZuKatalogId(abschluss: AbschlussTyp): number {
   return KATALOG_ID[abschluss]
 }
 
+export function katalogIdZuAbschluss(id: number | null | undefined): AbschlussTyp | null {
+  const eintrag = Object.entries(KATALOG_ID).find(([, kid]) => kid === id)
+  return eintrag ? eintrag[0] as AbschlussTyp : null
+}
+
 // Wert für 'idAbschlussart': 1 = Abschluss erreicht, 2 = ohne Abschluss
 // (0 = Jahrgang ohne Abschluss und 3 = ohne Abschluss mit Nachprüfung vergibt Prognos nicht)
 export function abschlussartZuSchild(abschluss: AbschlussTyp): 1 | 2 {

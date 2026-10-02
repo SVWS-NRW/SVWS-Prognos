@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { abschlussZuKatalogId, abschlussZuSchild, abschlussartZuSchild, istAOSF, istApoSI20, schildZuAbschluss } from './schildAbschluss'
+import { abschlussZuKatalogId, katalogIdZuAbschluss, abschlussZuSchild, abschlussartZuSchild, istAOSF, istApoSI20, schildZuAbschluss } from './schildAbschluss'
 
 describe('Abschluss → Schild-NRW', () => {
   it('Kürzel wie in Prueford_Optionen (OP_Krz)', () => {
@@ -24,6 +24,14 @@ describe('Abschluss → ID im Katalog SchulabschlussAllgemeinbildend', () => {
     expect(abschlussZuKatalogId('EESA')).toBe(5001)
     expect(abschlussZuKatalogId('MSA')).toBe(10000)
     expect(abschlussZuKatalogId('MSA_Q')).toBe(11000)
+  })
+
+  it('Rückrichtung', () => {
+    expect(katalogIdZuAbschluss(0)).toBe('OA')
+    expect(katalogIdZuAbschluss(5001)).toBe('EESA')
+    expect(katalogIdZuAbschluss(11000)).toBe('MSA_Q')
+    expect(katalogIdZuAbschluss(2000)).toBeNull()
+    expect(katalogIdZuAbschluss(null)).toBeNull()
   })
 })
 

@@ -289,19 +289,23 @@
       v-model:visible="showNotenWarnung"
       modal
       :header="faecherGeloescht && !notenGeaendert ? 'Fach wird gelöscht' : 'Änderungen speichern'"
-      :style="{ width: '26rem' }"
+      :style="{ width: '32rem' }"
       :draggable="false"
     >
       <p class="noten-warn-text">
+        Noch nicht gespeichert:
+      </p>
+      <ul class="aenderungen-liste">
+        <li v-for="a in aenderungen" :key="a">{{ a }}</li>
+      </ul>
+      <p class="noten-warn-text">
         <template v-if="faecherGeloescht">Gelöschte Fächer werden dauerhaft aus dem SVWS-Server entfernt.<br></template>
         <template v-if="notenGeaendert">Geänderte Noten werden dauerhaft in den SVWS-Server übernommen.<br></template>
-        <template v-if="prognosetextGeaendert">Der aktuelle Prognosetext ist noch nicht gespeichert.<br></template>
         <template v-if="kursartAbweichungen.length > 0">Geänderte Kursarten werden nicht in SVWS übernommen; sie sind im Prognosetext vermerkt.<br></template>
         <template v-if="neueFaecherVorhanden">
           <br><i class="pi pi-info-circle" style="color: var(--p-blue-500)" /> Neu hinzugefügte Fächer können hier nicht gespeichert werden und werden ignoriert. Fächer können nur in der Hauptanwendung (SVWS) angelegt werden.<br>
         </template>
-        <template v-if="faecherGeloescht || notenGeaendert || prognosetextGeaendert">Möchten Sie die Änderungen speichern oder verwerfen?</template>
-        <template v-else>Möchten Sie trotzdem fortfahren?</template>
+        Möchten Sie die Änderungen speichern oder verwerfen?
       </p>
       <template #footer>
         <Button label="Abbrechen" text size="small" @click="showNotenWarnung = false" />
@@ -344,7 +348,7 @@ import type { SchuelerAbschnitt, SvwsPruefungsordnung } from '@/services/svwsSer
 import { ordneRechenKuerzelZu } from '@/services/prognoseEingabe'
 import { toAppError } from '@/services/errorService'
 import { isAxiosError } from 'axios'
-import { ABSCHLUSS_KURZ, APO_SI20_PO, abschlussZuKatalogId, abschlussZuSchild, abschlussartZuSchild, istAOSF, istApoSI20 } from '@/services/schildAbschluss'
+import { ABSCHLUSS_KURZ, APO_SI20_PO, abschlussZuKatalogId, katalogIdZuAbschluss, abschlussZuSchild, abschlussartZuSchild, istAOSF, istApoSI20 } from '@/services/schildAbschluss'
 import type { FachDaten } from '@/models/Fach'
 import type { SvwsAbschlussdaten, SvwsLernabschnittsdaten } from '@/models/Lernabschnitt'
 import ThemeToggle from '@/components/ThemeToggle.vue'
@@ -533,17 +537,59 @@ const faecherGeloescht = computed(() => {
 
 const neueFaecherVorhanden = computed(() => faecher.value.some(f => f.svwsId === null))
 
-const hasChanges = computed(() => {
+function poKurz(po: string | null | undefined): string {
+  return po ? po.split('/')[1] ?? po : '–'
+}
+
+function jaNein(wert: boolean | null | undefined): string {
+  return wert === true ? 'ja' : wert === false ? 'nein' : '–'
+}
+
+function abschlussKurz(abschluss: AbschlussTyp | null): string {
+  return abschluss ? ABSCHLUSS_KURZ[abschluss] : '–'
+}
+
+// Alle noch nicht gespeicherten Änderungen, lesbar für den Dialog; bestimmt auch hasChanges
+const aenderungen = computed((): string[] => {
   const la = rawLernabschnitt.value
-  if (!la || nurAnsehen.value) return false
-  if (selectedPO.value !== la.pruefungsOrdnung) return true
-  if (istAbschlussPrognose.value !== (la.istAbschlussPrognose ?? !istAbschlussPrognose.value)) return true
-  if (faecherGeloescht.value) return true
-  if (neueFaecherVorhanden.value) return true
-  if (abschlussGeaendert.value) return true
-  if (prognosetextGeaendert.value) return true
-  return notenGeaendert.value
+  if (!la || nurAnsehen.value) return []
+  const liste: string[] = []
+  if (selectedPO.value !== la.pruefungsOrdnung) {
+    liste.push(`Prüfungsordnung: ${poKurz(la.pruefungsOrdnung)} → ${poKurz(selectedPO.value)}`)
+  }
+  if (istAbschlussPrognose.value !== (la.istAbschlussPrognose ?? !istAbschlussPrognose.value)) {
+    liste.push(`„Ist Prognose“: ${jaNein(la.istAbschlussPrognose)} → ${jaNein(istAbschlussPrognose.value)}`)
+  }
+  if (abschlussGeaendert.value && ergebnis.value) {
+    const ad = rawAbschlussdaten.value
+    const quartal = notenModus.value === 'quartal'
+    const alt = katalogIdZuAbschluss(quartal ? ad?.idAbschlussQuartalsprognose : ad?.idAbschluss)
+    if (alt !== ergebnis.value.empfehlung) {
+      liste.push(`${quartal ? 'Quartalsprognose' : 'Abschluss'}: ${abschlussKurz(alt)} → ${abschlussKurz(ergebnis.value.empfehlung)}`)
+    } else {
+      liste.push(`Abschlussart: ${ad?.idAbschlussart ?? '–'} → ${abschlussartZuSchild(ergebnis.value.empfehlung)}`)
+    }
+  }
+  if (prognosetextGeaendert.value) {
+    liste.push(`Prognosetext${notenModus.value === 'quartal' ? ' (Quartalsprognose)' : ''} ist neu berechnet`)
+  }
+  if (lbnwNote.value !== (la.noteLernbereichNW ?? null)) {
+    liste.push(`Note LBNW: ${la.noteLernbereichNW ?? '–'} → ${lbnwNote.value ?? '–'}`)
+  }
+  for (const rohF of rohFaecher.value) {
+    const fach = faecher.value.find(f => f.svwsId === rohF.svwsId)
+    if (!fach) {
+      liste.push(`Fach ${rohF.kuerzel} wird gelöscht`)
+      continue
+    }
+    const orig = notenModus.value === 'quartal' ? rohF.noteQuartal : rohF.noteHalbjahr
+    if (fach.note !== orig) liste.push(`${notenModus.value === 'quartal' ? 'Quartalsnote' : 'Note'} ${fach.kuerzel}: ${orig ?? '–'} → ${fach.note ?? '–'}`)
+  }
+  if (neueFaecherVorhanden.value) liste.push('Neu hinzugefügte Fächer (werden nicht gespeichert)')
+  return liste
 })
+
+const hasChanges = computed(() => aenderungen.value.length > 0)
 
 // Nur Abschnitte, in denen der Schüler einen Lernabschnitt in Jg. 8–10 hat (nur dafür rechnet
 // die Engine; für frühe Abschnitte liefert der Server teils auch 500)
@@ -1153,4 +1199,5 @@ function mapKursart(k: string | null): 'E' | 'G' | 'Sonstige' {
   line-height: 1.5;
   color: var(--p-text-color);
 }
+.aenderungen-liste { margin: 0.25rem 0 0.75rem; padding-left: 1.25rem; font-size: 0.9rem; line-height: 1.5; }
 </style>
