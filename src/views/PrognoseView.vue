@@ -107,6 +107,7 @@
           </div>
           <div v-else-if="abschlussNichtUnterstuetzt" class="abschluss-hinweis">
             Abschluss wird nicht gespeichert: {{ abschlussNichtUnterstuetzt }}
+            {{ prognosetextSpeicherbar ? 'Der Prognosetext wird gespeichert.' : 'Der Prognosetext wird hier nur mit Halbjahresnoten gespeichert.' }}
           </div>
           <div v-else-if="!abschlussWirdGespeichert" class="abschluss-hinweis">
             Abschluss wird nur mit Prüfungsordnung APO-SI20 gespeichert
@@ -238,6 +239,7 @@
           </div>
           <div class="result-protokoll">
             <div class="plog plog--info">Berechnung wurde mit {{ notenModus === 'quartal' ? 'Quartalsnoten' : 'Halbjahresnoten' }} durchgeführt.</div>
+            <div v-if="kursartAbweichungen.length > 0" class="plog plog--warn">⚠ {{ KURSARTEN_PRAEFIX }}{{ kursartAbweichungen.join(', ') }}</div>
             <div class="plog">&nbsp;</div>
             <div
               v-for="(line, i) in ergebnis.protokoll"
@@ -265,7 +267,8 @@
     >
       <p class="noten-warn-text">
         <i class="pi pi-info-circle" style="color: var(--p-blue-500)" />
-        Die Änderung der Kursart wird <strong>nicht gespeichert</strong> und verworfen.
+        Die Änderung der Kursart wird <strong>nicht in SVWS gespeichert</strong>. Sie wird im
+        Prognosetext vermerkt und beim nächsten Öffnen für die Prognose wieder angenommen.
         <br><br>
         Ein Kurswechsel verändert die Kurszuordnung des Schülers und muss direkt im
         <strong>SVWS-Client</strong> oder in <strong>SchILD-NRW 3</strong> durchgeführt werden.
@@ -292,10 +295,12 @@
       <p class="noten-warn-text">
         <template v-if="faecherGeloescht">Gelöschte Fächer werden dauerhaft aus dem SVWS-Server entfernt.<br></template>
         <template v-if="notenGeaendert">Geänderte Noten werden dauerhaft in den SVWS-Server übernommen.<br></template>
+        <template v-if="prognosetextGeaendert">Der aktuelle Prognosetext ist noch nicht gespeichert.<br></template>
+        <template v-if="kursartAbweichungen.length > 0">Geänderte Kursarten werden nicht in SVWS übernommen; sie sind im Prognosetext vermerkt.<br></template>
         <template v-if="neueFaecherVorhanden">
           <br><i class="pi pi-info-circle" style="color: var(--p-blue-500)" /> Neu hinzugefügte Fächer können hier nicht gespeichert werden und werden ignoriert. Fächer können nur in der Hauptanwendung (SVWS) angelegt werden.<br>
         </template>
-        <template v-if="faecherGeloescht || notenGeaendert">Möchten Sie die Änderungen speichern oder verwerfen?</template>
+        <template v-if="faecherGeloescht || notenGeaendert || prognosetextGeaendert">Möchten Sie die Änderungen speichern oder verwerfen?</template>
         <template v-else>Möchten Sie trotzdem fortfahren?</template>
       </p>
       <template #footer>
@@ -419,6 +424,59 @@ function abschlussFelder(empfehlung: AbschlussTyp): Partial<SvwsAbschlussdaten> 
     : { idAbschluss: id, idAbschlussart: abschlussartZuSchild(empfehlung), textErgebnisPruefungsalgorithmus: text }
 }
 
+// Prognosetext: mit dem Abschluss über /abschluesse, in Jg. 8 (dort nicht unterstützt) über die
+// Lernabschnittsdaten — für die Quartalsprognose gibt es dort kein Feld
+const prognosetextSpeicherbar = computed(() =>
+  istApoSI20(selectedPO.value) && !nurAnsehen.value
+  && (!abschlussNichtUnterstuetzt.value || notenModus.value === 'halbjahr')
+)
+
+function ohneKopfzeile(text: string | null | undefined): string | null {
+  return text ? text.split('\n').slice(1).join('\n') : null
+}
+
+const gespeicherterPrognosetext = computed(() =>
+  abschlussNichtUnterstuetzt.value
+    ? rawLernabschnitt.value?.textErgebnisPruefungsalgorithmus ?? null
+    : notenModus.value === 'quartal'
+      ? rawAbschlussdaten.value?.textErgebniseQuartalsprognose ?? null
+      : rawAbschlussdaten.value?.textErgebnisPruefungsalgorithmus ?? null
+)
+
+// Erfasst auch Änderungen, die den Abschluss nicht ändern (z.B. nur angenommene Kursarten)
+const prognosetextGeaendert = computed(() => {
+  if (!prognosetextSpeicherbar.value || !ergebnis.value) return false
+  return ohneKopfzeile(protokollText(ergebnis.value.empfehlung, ergebnis.value.protokoll))
+    !== ohneKopfzeile(gespeicherterPrognosetext.value)
+})
+
+// Kursarten werden nicht in SVWS geschrieben, sondern im Prognosetext vermerkt
+// ("FLD-Kursarten für die Prognose geändert, …: M: E (SVWS: Sonstige), …"). Beim Laden werden sie
+// wieder angenommen, solange die Kursart in SVWS noch die damals notierte ist.
+const KURSARTEN_PRAEFIX = 'FLD-Kursarten für die Prognose geändert, nicht in SVWS gespeichert: '
+
+function mitAngenommenenKursarten(liste: FormFach[]): FormFach[] {
+  const zeile = gespeicherterPrognosetext.value?.split('\n').find(z => z.startsWith(KURSARTEN_PRAEFIX))
+  if (!zeile) return liste
+  const angenommen = new Map<string, { kursart: FormFach['kursart']; svws: string }>()
+  for (const m of zeile.matchAll(/(\S+): (E|G|Sonstige) \(SVWS: (E|G|Sonstige)\)/g)) {
+    angenommen.set(m[1], { kursart: m[2] as FormFach['kursart'], svws: m[3] })
+  }
+  return liste.map(f => {
+    const a = angenommen.get(f.kuerzel)
+    const roh = rohFaecher.value.find(r => r.svwsId === f.svwsId)
+    return a && roh?.kursart === a.svws ? { ...f, kursart: a.kursart } : f
+  })
+}
+
+// Kursarten, die nur für die Prognose von den SVWS-Daten abweichend angenommen wurden
+const kursartAbweichungen = computed(() =>
+  faecher.value.flatMap(f => {
+    const roh = rohFaecher.value.find(r => r.svwsId === f.svwsId)
+    return roh && roh.kursart !== f.kursart ? [`${f.kuerzel}: ${f.kursart} (SVWS: ${roh.kursart})`] : []
+  })
+)
+
 const abschlussGeaendert = computed(() => {
   if (!abschlussWirdGespeichert.value || !ergebnis.value) return false
   const ad = rawAbschlussdaten.value
@@ -483,6 +541,7 @@ const hasChanges = computed(() => {
   if (faecherGeloescht.value) return true
   if (neueFaecherVorhanden.value) return true
   if (abschlussGeaendert.value) return true
+  if (prognosetextGeaendert.value) return true
   return notenGeaendert.value
 })
 
@@ -587,10 +646,10 @@ const ergebnis = computed(() => {
 
 watch(notenModus, () => {
   if (rohFaecher.value.length === 0) return
-  faecher.value = kernfaecherNachOben(rohFaecher.value.map(f => ({
+  faecher.value = kernfaecherNachOben(mitAngenommenenKursarten(rohFaecher.value.map(f => ({
     ...f,
     note: notenModus.value === 'quartal' ? f.noteQuartal : f.noteHalbjahr,
-  })))
+  }))))
 })
 
 // Neuer Schüler: wieder mit dem Abschnitt der Schülerliste beginnen
@@ -686,14 +745,14 @@ async function laden(abschnittIdParam?: number, nachSpeichern = false) {
       } satisfies RohFach
     })
 
-    faecher.value = kernfaecherNachOben(rohFaecher.value.map(f => ({
+    faecher.value = kernfaecherNachOben(mitAngenommenenKursarten(rohFaecher.value.map(f => ({
       kuerzel: f.kuerzel,
       bezeichnung: f.bezeichnung,
       note: notenModus.value === 'quartal' ? f.noteQuartal : f.noteHalbjahr,
       kursart: f.kursart,
       istFremdsprache: f.istFremdsprache,
       svwsId: f.svwsId,
-    })))
+    }))))
 
   } catch (e: any) {
     setzeZurueck()
@@ -748,6 +807,9 @@ async function doSpeichern() {
     if (selectedPO.value) body.pruefungsOrdnung = selectedPO.value
     if (lbnwNote.value !== rawLernabschnitt.value.noteLernbereichNW) {
       body.noteLernbereichNW = lbnwNote.value
+    }
+    if (abschlussNichtUnterstuetzt.value && prognosetextSpeicherbar.value && ergebnis.value) {
+      body.textErgebnisPruefungsalgorithmus = protokollText(ergebnis.value.empfehlung, ergebnis.value.protokoll)
     }
     await patchLernabschnittsdaten(rawLernabschnitt.value.id, body)
 
@@ -818,7 +880,10 @@ function addFach() {
 function protokollText(empfehlung: AbschlussTyp, protokoll: string[]): string {
   const kopf = `SVWS-Prognos · APO-SI20 · Jg. ${jahrgang.value ?? '–'}${halbjahr.value ? `/${halbjahr.value}. Hj.` : ''}`
     + ` · ${notenModus.value === 'quartal' ? 'Quartalsnoten' : 'Halbjahresnoten'} · ${new Date().toLocaleString('de-DE')}`
-  return [kopf, `Prognose: ${ABSCHLUSS_KURZ[empfehlung]}`, '', ...protokoll].join('\n')
+  const kursarten = kursartAbweichungen.value.length > 0
+    ? [KURSARTEN_PRAEFIX + kursartAbweichungen.value.join(', ')]
+    : []
+  return [kopf, `Prognose: ${ABSCHLUSS_KURZ[empfehlung]}`, ...kursarten, '', ...protokoll].join('\n')
 }
 
 function protokollClass(line: string): string {
@@ -1019,9 +1084,9 @@ function mapKursart(k: string | null): 'E' | 'G' | 'Sonstige' {
 .result--msa   .result-header { background: #eff6ff; color: #1e40af; }
 .result--msa-q .result-header { background: #f0fdf4; color: #166534; }
 
-.result-badge  { font-size: 1.3rem; font-weight: 700; letter-spacing: 0.02em; line-height: 1; }
-.result-name   { font-size: 0.7rem; font-weight: 600; line-height: 1.3; }
-.result-sub    { font-size: 0.62rem; opacity: 0.65; }
+.result-badge  { font-size: 1.8rem; font-weight: 700; letter-spacing: 0.02em; line-height: 1; }
+.result-name   { font-size: 0.95rem; font-weight: 600; line-height: 1.3; }
+.result-sub    { font-size: 0.8rem; opacity: 0.65; }
 
 .result-hinweise {
   display: flex;
@@ -1037,17 +1102,18 @@ function mapKursart(k: string | null): 'E' | 'G' | 'Sonstige' {
   padding: 0.4rem 0.5rem;
   overflow-y: auto;
   font-family: monospace;
-  font-size: 0.68rem;
+  font-size: 0.9rem;
   line-height: 1.45;
   background: var(--p-content-background);
 }
 
-.plog         { white-space: pre; color: var(--p-text-color); }
+/* pre-wrap: lange Zeilen umbrechen statt seitlich überlaufen, Einrückung bleibt */
+.plog         { white-space: pre-wrap; color: var(--p-text-color); }
 .plog--head   { font-weight: 600; color: var(--p-text-color); margin-top: 0.2rem; }
 .plog--ok     { color: #15803d; font-weight: 600; }
 .plog--fail   { color: #b91c1c; }
 .plog--warn   { color: #b45309; }
-.plog--result { font-weight: 700; font-size: 0.72rem; color: var(--p-primary-color); margin-top: 0.2rem; }
+.plog--result { font-weight: 700; font-size: 0.95rem; color: var(--p-primary-color); margin-top: 0.2rem; }
 .plog--info   { color: #60a5fa; margin-bottom: 0.3rem; }
 
 .result-icon-leer { font-size: 1.4rem; opacity: 0.3; }

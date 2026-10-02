@@ -390,4 +390,7 @@ npm run build        # Produktions-Build nach dist/
    Server-Eigenheit: ungültige ID → still `null`
    (daher Antwort des PATCH prüfen, 200 mit `Abschlussdaten`).
    Jg. 8: GET/PATCH → 400 „Abschlussberechnung nicht unterstützt“ — Ansicht lädt trotzdem,
-   Abschluss wird dort nicht gespeichert (`abschlussNichtUnterstuetzt` in PrognoseView).
+   Abschluss wird dort nicht gespeichert (`abschlussNichtUnterstuetzt` in PrognoseView); der
+   Prognosetext geht dann über die Lernabschnittsdaten. Angenommene Kursarten (nicht in SVWS
+   gespeichert) stehen im Prognosetext und werden beim Öffnen wieder angenommen
+   (`mitAngenommenenKursarten()`).

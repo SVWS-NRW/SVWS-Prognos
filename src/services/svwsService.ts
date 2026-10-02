@@ -139,6 +139,7 @@ export async function loadSvwsLernabschnittsdatenOderNull(
     abschlussart: entry.abschlussart ?? null,
     istAbschlussPrognose: entry.istAbschlussPrognose ?? null,
     pruefungsOrdnung: entry.pruefungsOrdnung ?? null,
+    textErgebnisPruefungsalgorithmus: entry.textErgebnisPruefungsalgorithmus ?? null,
     leistungsdaten: (entry.leistungsdaten ?? []).map((l: any) => ({
       id: l.id,
       fachID: l.fachID,

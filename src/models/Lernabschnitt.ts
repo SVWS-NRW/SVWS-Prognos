@@ -18,6 +18,7 @@ export interface SvwsLernabschnittsdaten {
   abschlussart: number | null
   istAbschlussPrognose: boolean | null
   pruefungsOrdnung: string | null
+  textErgebnisPruefungsalgorithmus: string | null
   leistungsdaten: SvwsLeistungsdaten[]
 }
 

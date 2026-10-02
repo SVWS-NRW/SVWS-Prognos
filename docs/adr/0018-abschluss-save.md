@@ -132,6 +132,9 @@ Die Konvertierung zwischen PM2-Kürzeln und SchILD-Feldwerten übernimmt
     Abschlussberechnung aktuell nicht unterstützt.“). `loadAbschlussdaten()` liefert dann den
     Grund statt der Daten; die PrognoseView rechnet weiter, zeigt den Grund an und lässt
     Schritt 2 aus (Noten, Prüfungsordnung und Prognose-Flag werden gespeichert).
+    Den Prognosetext schreibt Prognos in Jg. 8 stattdessen in Schritt 1 nach
+    `textErgebnisPruefungsalgorithmus` der Lernabschnittsdaten (nur mit Halbjahresnoten; für die
+    Quartalsprognose gibt es dort kein Feld).
     Entscheidung (Oktober 2026): so belassen. Melden Schulen Bedarf für das Speichern in Jg. 8,
     muss der SVWS-Server das freischalten; in Prognos ist dafür keine Änderung nötig.
 - Die Kürzel entsprechen `OP_Krz` aus `/schild3/pruefungsordnungen/optionen`. Gesamt-,
@@ -151,6 +154,11 @@ Die Konvertierung zwischen PM2-Kürzeln und SchILD-Feldwerten übernimmt
   `apoSI20Option`/`poOptionen` in `PrognoseView` und `istApoSI20()` in `schildAbschluss.ts` erweitern).
 - Der Abschluss wird nur geschrieben, wenn die gewählte Prüfungsordnung APO-SI20 ist,
   weil die Engine nur APO-SI20 berechnet.
+- Kursarten ändert Prognos nicht in SVWS. Für die Prognose angenommene Kursarten stehen im
+  Prognosetext („FLD-Kursarten für die Prognose geändert, nicht in SVWS gespeichert: M: E (SVWS: Sonstige)“; auch
+  im Protokoll auf dem Bildschirm) und werden beim
+  Öffnen wieder angenommen, solange die Kursart in SVWS noch die notierte ist. „Speichern“ wird
+  auch aktiv, wenn sich nur der Prognosetext ändert (Vergleich ohne Kopfzeile mit Zeitstempel).
 - Nicht geschrieben werden `versetzungsvermerk` (eigene Berechnung, folgt später) und
   `nachpruefungen.moegliche` (Nachprüfungsfächer berechnet die Engine noch nicht).
 - Gelesen werden gespeicherte Abschlüsse über `schildZuAbschluss()`, das auch die

@@ -504,18 +504,18 @@ function abschlussName(a: AbschlussTyp): string {
 .result--msa-q .result-header { background: #f0fdf4; color: #166534; }
 
 .result-badge {
-  font-size: 1.3rem;
+  font-size: 1.8rem;
   font-weight: 700;
   letter-spacing: 0.02em;
   line-height: 1;
 }
 .result-name {
-  font-size: 0.7rem;
+  font-size: 0.95rem;
   font-weight: 600;
   line-height: 1.3;
 }
 .result-sub {
-  font-size: 0.62rem;
+  font-size: 0.8rem;
   opacity: 0.65;
 }
 
@@ -534,13 +534,13 @@ function abschlussName(a: AbschlussTyp): string {
   padding: 0.4rem 0.5rem;
   overflow-y: auto;
   font-family: monospace;
-  font-size: 0.68rem;
+  font-size: 0.9rem;
   line-height: 1.45;
   background: var(--p-content-background);
 }
 
 .plog {
-  white-space: pre;
+  white-space: pre-wrap;
   color: var(--p-text-color);
 }
 .plog--head  { font-weight: 600; color: var(--p-text-color); margin-top: 0.2rem; }
@@ -549,7 +549,7 @@ function abschlussName(a: AbschlussTyp): string {
 .plog--warn  { color: #b45309; }
 .plog--result {
   font-weight: 700;
-  font-size: 0.72rem;
+  font-size: 0.95rem;
   color: var(--p-primary-color);
   margin-top: 0.2rem;
 }
