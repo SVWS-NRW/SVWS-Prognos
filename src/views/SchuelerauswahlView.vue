@@ -138,7 +138,7 @@ const selectedAbschnittId = ref<number | null>(abschnittStore.ausgewaehltId)
 const selectedStatus = ref<number | null>(2)
 
 // Spaltenbreiten in px: Nachname, Vorname, Klasse, Abschluss, Prüfungsordnung, ist Prognose
-const spaltenBreiten = ref([150, 130, 85, 100, 140, 110])
+const spaltenBreiten = ref([240, 200, 110, 140, 180, 130])
 
 const abschnittOptionen = computed(() =>
   abschnittStore.abschnitte.map(a => ({ label: a.bezeichnung, value: a.id }))
@@ -286,7 +286,7 @@ function navigiereZurPrognose(schuelerId: number) {
   gap: 0.5rem;
 }
 .toolbar-title {
-  font-size: 0.9rem;
+  font-size: 1.05rem;
   font-weight: 600;
 }
 .toolbar-sep { flex: 1; }
@@ -309,7 +309,7 @@ function navigiereZurPrognose(schuelerId: number) {
   gap: 0.5rem;
 }
 .tabelle-info {
-  font-size: 0.75rem;
+  font-size: 0.85rem;
   color: var(--p-text-muted-color);
 }
 
@@ -324,15 +324,15 @@ function navigiereZurPrognose(schuelerId: number) {
 .schueler-table {
   border-collapse: separate;
   border-spacing: 0;
-  font-size: 0.8rem;
+  font-size: 1rem;
   table-layout: fixed;
   width: 100%;
 }
 
 .schueler-table th {
   text-align: left;
-  padding: 0.3rem 0.75rem;
-  font-size: 0.72rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
   font-weight: 500;
   color: var(--p-text-muted-color);
   border-bottom: 1px solid var(--p-content-border-color);
@@ -347,7 +347,7 @@ function navigiereZurPrognose(schuelerId: number) {
 
 .schueler-table td {
   text-align: left;
-  padding: 0.4rem 0.75rem;
+  padding: 0.6rem 1rem;
   border-bottom: 1px solid var(--p-content-border-color);
   vertical-align: middle;
   overflow: hidden;
@@ -370,7 +370,7 @@ function navigiereZurPrognose(schuelerId: number) {
 .td-abschluss { font-weight: 500; }
 .td-prognose  { color: var(--p-text-muted-color); text-align: center; }
 .td-action    { text-align: right; }
-.action-icon { font-size: 0.7rem; color: var(--p-text-muted-color); }
+.action-icon { font-size: 0.85rem; color: var(--p-text-muted-color); }
 
 .td-empty {
   text-align: center;

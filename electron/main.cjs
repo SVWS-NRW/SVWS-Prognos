@@ -44,6 +44,8 @@ function createWindow() {
     }
   })
 
+  // 1400×900 bleibt die Größe beim Verlassen der Maximierung
+  win.maximize()
   win.loadFile(path.join(__dirname, '../dist/index.html'))
 }
 

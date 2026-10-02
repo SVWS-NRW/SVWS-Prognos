@@ -764,17 +764,22 @@ function abschlussName(a: AbschlussTyp): string {
   return n[a]
 }
 
-const KERNFACH_REIHENFOLGE = ['D', 'M', 'E']
+// Fächergruppe I (D, M, E, WP) oben, danach das NW-Fach mit Fachleistungsdifferenzierung,
+// EGSN ganz unten; die übrigen Fächer behalten ihre Reihenfolge aus SVWS
+const FG1_REIHENFOLGE = ['D', 'M', 'E', 'WPU']
+const NW_FAECHER = ['BI', 'CH', 'PH']
 
-function kernfaecherNachOben<T extends { kuerzel: string }>(arr: T[]): T[] {
-  return [...arr].sort((a, b) => {
-    const ia = KERNFACH_REIHENFOLGE.indexOf(a.kuerzel)
-    const ib = KERNFACH_REIHENFOLGE.indexOf(b.kuerzel)
-    if (ia !== -1 && ib !== -1) return ia - ib
-    if (ia !== -1) return -1
-    if (ib !== -1) return 1
-    return 0
-  })
+function sortierRang(fach: { kuerzel: string; kursart: string }): number {
+  const kuerzel = /^WP\d/.test(fach.kuerzel) ? 'WPU' : fach.kuerzel
+  const fg1 = FG1_REIHENFOLGE.indexOf(kuerzel)
+  if (fg1 !== -1) return fg1
+  if (NW_FAECHER.includes(kuerzel) && (fach.kursart === 'E' || fach.kursart === 'G')) return FG1_REIHENFOLGE.length
+  if (kuerzel === 'EGSN') return 99
+  return 50
+}
+
+function kernfaecherNachOben<T extends { kuerzel: string; kursart: string }>(arr: T[]): T[] {
+  return [...arr].sort((a, b) => sortierRang(a) - sortierRang(b))
 }
 
 function mapKursart(k: string | null): 'E' | 'G' | 'Sonstige' {

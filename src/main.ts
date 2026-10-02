@@ -14,10 +14,6 @@ import './style.css'
 
 initTheme()
 
-if (!navigator.userAgent.includes('Electron')) {
-  document.documentElement.classList.add('browser')
-}
-
 const app = createApp(App)
 
 app.use(createPinia())
