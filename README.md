@@ -31,8 +31,41 @@ Alle Architekturentscheidungen sind in [docs/adr/](docs/adr/) dokumentiert.
 npm install
 npm run dev        # Dev-Server auf http://localhost:5173
 npm run build      # Statisches Bundle → dist/
-npm run release    # AppImage + NSIS-Installer + Web-ZIP → release/
+npm run release:build   # AppImage + NSIS-Installer + Web-ZIP → release/ (ohne Versionserhöhung/Upload)
+npm run release         # Version erhöhen, bauen, Commit + Tag pushen, GitHub-Draft (s. u.)
 ```
+
+### Release erstellen
+
+Voraussetzungen: `wine` (für den Windows-Installer), angemeldete [GitHub CLI](https://cli.github.com/)
+(`gh auth status`), alle Änderungen committet und der Branch hat einen Upstream auf GitHub.
+
+```bash
+npm run release          # patch: 0.3.3 → 0.3.4
+npm run release --patch  # dasselbe, Flag-Schreibweise (mit oder ohne -- davor)
+npm run release minor    # minor: 0.3.3 → 0.4.0
+npm run release major    # major: 0.3.3 → 1.0.0
+```
+
+[scripts/release.mjs](scripts/release.mjs) (wie in SVWS-Import) führt nacheinander aus:
+
+1. Voraussetzungen prüfen – bricht ab, bevor irgendetwas verändert wird
+2. `npm version <patch|minor|major>` – erhöht die Version in `package.json`/`package-lock.json`,
+   erzeugt Commit und Tag `v<version>`
+3. `npm run release:build` – baut AppImage, Windows-Installer und Webserver-ZIP nach `release/`
+4. `git push --follow-tags` – pusht Commit und Tag
+5. `npm run release:github` – legt den Release-Entwurf „Release `<version>`“ mit den drei Dateien an
+
+Danach auf GitHub unter **Releases** den Entwurf öffnen, Release-Notes eintragen und veröffentlichen.
+
+Fehlerfälle:
+
+- **Build schlägt fehl:** Commit und Tag werden lokal zurückgenommen, nichts wurde gepusht.
+  Fehler beheben und denselben Befehl erneut ausführen.
+- **Push oder Upload schlägt fehl:** Version ist erhöht, Dateien liegen in `release/`. Fortsetzen mit
+  `git push --follow-tags && npm run release:github`.
+- **Release existiert bereits:** `gh` bricht ab. Entwurf auf GitHub löschen und
+  `npm run release:github` erneut ausführen.
 
 ## SVWS-Schnittstelle (OpenAPI + Kataloge)
 
