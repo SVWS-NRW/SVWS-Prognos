@@ -92,6 +92,30 @@ export async function loadSvwsLernabschnittsdaten(
   return la
 }
 
+export interface SchuelerAbschnitt {
+  abschnittId: number
+  schuljahr: number
+  abschnitt: number
+  jahrgang: string
+  klasse: string | null
+}
+
+// Alle Schuljahresabschnitte, in denen der Schüler einen Lernabschnitt hat, mit dem dortigen
+// Jahrgang und der Klasse (die Auswahlliste liefert für frühere Abschnitte ohne Lernabschnitt
+// stattdessen die aktuellen Daten)
+export async function loadSchuelerAbschnitte(schuelerId: number): Promise<SchuelerAbschnitt[]> {
+  const { data } = await getApiClient().get(`/schueler/${schuelerId}/lernabschnitte`)
+  return (Array.isArray(data) ? data : [])
+    .filter((la: any) => la?.wechselNr === 0)
+    .map((la: any) => ({
+      abschnittId: la.schuljahresabschnitt,
+      schuljahr: la.schuljahr,
+      abschnitt: la.abschnitt,
+      jahrgang: normalisiereJahrgang(la.jahrgang ?? ''),
+      klasse: la.klasse || null,
+    }))
+}
+
 // null, wenn der Schüler im Abschnitt keinen Lernabschnitt hat (z.B. Ehemalige, die die
 // Auswahlliste trotzdem enthält; der Server liefert dann ein leeres Array)
 export async function loadSvwsLernabschnittsdatenOderNull(
@@ -235,4 +259,10 @@ export async function loadSchueler(klasseId: number): Promise<Schueler[]> {
 export async function loadNotenbild(schuelerId: number): Promise<NotenbildSchueler> {
   const { data } = await getApiClient().get(`/schueler/${schuelerId}/lernabschnitte/`)
   return { schuelerId, lernabschnitte: data }
+}
+
+// '09' → '9'; Kürzel wie 'EF' oder 'Q1' bleiben unverändert
+function normalisiereJahrgang(jg: string): string {
+  const n = parseInt(jg, 10)
+  return Number.isNaN(n) ? jg : String(n)
 }

@@ -38,6 +38,8 @@ export interface Schueler {
   svwsAbschluss?: string | null
   svwsIstAbschlussPrognose?: boolean | null
   svwsPruefungsOrdnung?: string | null
+  // true: kein Lernabschnitt im Abschnitt der Liste (die Auswahlliste enthält solche Schüler trotzdem)
+  svwsKeinLernabschnitt?: boolean
 }
 
 export interface Schuljahresabschnitt {

@@ -280,6 +280,20 @@ Nach einem Update prüfen, ob sich etwas für Prognos geändert hat:
 
 ---
 
+## Schuljahresabschnitt
+
+Schülerliste, Auswertungen und Dashboard zeigen immer den **aktuellen** Abschnitt aus den
+Schulstammdaten (`schuljahresabschnittStore.ausgewaehltId`, wird nur beim Anmelden gesetzt).
+Nur die PrognoseView kann für einen Schüler einen anderen Abschnitt wählen — lokal, angeboten
+werden nur seine Abschnitte in Jg. 8–10 (`/schueler/{id}/lernabschnitte`, mit damaligem
+Jahrgang/Klasse). Ein früherer Abschnitt ist dort **nur zum Ansehen** (`nurAnsehen`): gespeicherte
+Prüfungsordnung und „Ist Prognose“ werden unverändert angezeigt, Speichern ist gesperrt, kein
+Nachfrage-Dialog; Noten lassen sich zum Durchrechnen ändern. Der nächste Schüler bzw. jede andere
+Ansicht startet wieder im aktuellen Abschnitt. Hintergrund: Die Auswahlliste füllt frühere Abschnitte mit den aktuellen Daten auf
+(Schüler ohne Lernabschnitt erscheinen mit heutigem Jahrgang).
+
+---
+
 ## Pinia-Stores — Überblick
 
 | Store | Inhalt | Besonderheit |

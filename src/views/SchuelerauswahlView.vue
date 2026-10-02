@@ -4,15 +4,7 @@
       <Button icon="pi pi-arrow-left" text size="small" @click="router.push({ name: 'dashboard' })" />
       <span class="toolbar-title">Jahrgang {{ jg }}</span>
       <div class="toolbar-sep" />
-      <Select
-        v-model="selectedAbschnittId"
-        :options="abschnittOptionen"
-        option-label="label"
-        option-value="value"
-        size="small"
-        class="abschnitt-select"
-        @update:model-value="wechsleAbschnitt"
-      />
+      <span class="abschnitt-anzeige" title="Listen und Auswertungen zeigen immer den aktuellen Schuljahresabschnitt">{{ abschnittStore.ausgewaehlt?.bezeichnung ?? '–' }}</span>
       <Button icon="pi pi-refresh" text size="small" title="Neu laden" :loading="schuelerStore.abschlussLaedt" @click="neuLaden" />
       <Select
         v-model="selectedStatus"
@@ -136,17 +128,12 @@ const laedt = ref(false)
 const fehler = ref<string | null>(null)
 // Vorbelegung per Query, z.B. beim Sprung aus den Auswertungen: ?klasse=<id>&status=alle
 const selectedKlasseId = ref<number | null>(route.query.klasse ? Number(route.query.klasse) : null)
-const selectedAbschnittId = ref<number | null>(abschnittStore.ausgewaehltId)
 // PrimeVue-Select zeigt bei value null kein Label an, daher eigener Wert für 'Alle'
 const STATUS_ALLE = -1
 const selectedStatus = ref<number>(route.query.status === 'alle' ? STATUS_ALLE : 2)
 
 // Spaltenbreiten in px: Nachname, Vorname, Klasse, Abschluss, Prüfungsordnung, ist Prognose
 const spaltenBreiten = ref([240, 200, 110, 140, 180, 130])
-
-const abschnittOptionen = computed(() =>
-  abschnittStore.abschnitte.map(a => ({ label: a.bezeichnung, value: a.id }))
-)
 
 const statusOptionen = [
   { label: 'Alle',                   value: STATUS_ALLE },
@@ -165,7 +152,8 @@ const klassenOptionen = computed(() =>
 )
 
 const gefiltert = computed(() => {
-  let liste = schuelerStore.schueler
+  // Schüler ohne Lernabschnitt im gewählten Abschnitt ausblenden, sobald das bekannt ist
+  let liste = schuelerStore.schueler.filter(s => !s.svwsKeinLernabschnitt)
   if (selectedStatus.value !== STATUS_ALLE)
     liste = liste.filter(s => s.status === selectedStatus.value)
   if (selectedKlasseId.value !== null)
@@ -246,12 +234,6 @@ function formatPrognose(s: { svwsIstAbschlussPrognose?: boolean | null }): strin
   return s.svwsIstAbschlussPrognose ? 'P' : '✓'
 }
 
-async function wechsleAbschnitt(id: number) {
-  abschnittStore.waehleAbschnitt(id)
-  selectedKlasseId.value = null
-  await laden(id, false)
-}
-
 async function neuLaden() {
   const id = abschnittStore.ausgewaehltId
   if (id) await laden(id, true)
@@ -305,7 +287,7 @@ function navigiereZurPrognose(schuelerId: number) {
   font-weight: 600;
 }
 .toolbar-sep { flex: 1; }
-.abschnitt-select { width: 16rem; }
+.abschnitt-anzeige { font-size: 0.9rem; color: var(--p-text-muted-color); white-space: nowrap; }
 .status-select { width: 14rem; }
 .klassen-select { width: 14rem; }
 

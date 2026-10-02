@@ -8,7 +8,7 @@
         text
         size="small"
         title="Zurück zur Schülertabelle"
-        @click="pruefeUndNavigiere(() => router.push({ name: 'jahrgang', params: { jg: jahrgang ?? '' } }))"
+        @click="pruefeUndNavigiere(zurSchuelerliste)"
       />
       <Button icon="pi pi-arrow-left" text size="small" @click="pruefeUndNavigiere(() => router.back())" />
       <span class="toolbar-title">{{ schuelerName }}<span v-if="schuelerKlasse" class="toolbar-klasse"> · {{ schuelerKlasse }}</span><span class="toolbar-klasse" title="ID des Schülerdatensatzes"> · ID {{ schuelerId }}</span></span>
@@ -69,7 +69,7 @@
           <div class="btn-group">
             <Button icon="pi pi-plus" label="Fach hinzufügen" outlined size="small" @click="addFach" />
             <Button icon="pi pi-refresh" label="Neu laden" outlined size="small" severity="secondary" @click="() => laden()" />
-            <Button icon="pi pi-save" label="Speichern" outlined size="small" severity="success" :loading="speichert" :disabled="!hasChanges" @click="speichern" />
+            <Button icon="pi pi-save" label="Speichern" outlined size="small" severity="success" :loading="speichert" :disabled="!hasChanges || nurAnsehen" @click="speichern" />
           </div>
         </div>
 
@@ -85,7 +85,7 @@
               size="small"
               show-clear
               placeholder="–"
-              :disabled="istAOSFSchueler"
+              :disabled="istAOSFSchueler || nurAnsehen"
               class="po-select"
             />
           </div>
@@ -94,10 +94,14 @@
             <span class="abschluss-wert">{{ berechneterAbschlussAnzeige }}</span>
           </div>
           <div class="abschluss-field abschluss-field--check">
-            <Checkbox v-model="istAbschlussPrognose" :binary="true" input-id="ist-prog-chk" />
+            <Checkbox v-model="istAbschlussPrognose" :binary="true" input-id="ist-prog-chk" :disabled="nurAnsehen" />
             <label for="ist-prog-chk" class="abschluss-label">Ist Prognose</label>
           </div>
-          <div v-if="istAOSFSchueler" class="abschluss-hinweis">
+          <div v-if="nurAnsehen" class="abschluss-hinweis">
+            Früherer Abschnitt – nur zum Ansehen. Es wird nichts gespeichert; Noten können zum
+            Durchrechnen geändert werden.
+          </div>
+          <div v-else-if="istAOSFSchueler" class="abschluss-hinweis">
             Prüfungsordnung AOSF (sonderpädagogische Förderung): Prognos überschreibt weder
             Prüfungsordnung noch Abschluss
           </div>
@@ -326,12 +330,15 @@ import {
   loadAbschlussdaten,
   patchLernabschnittsdaten,
   patchAbschlussdaten,
+  loadSchuelerAbschnitte,
   patchLeistungsdaten,
   deleteLeistungsdaten,
   parseNoteString,
 } from '@/services/svwsService'
-import type { SvwsPruefungsordnung } from '@/services/svwsService'
+import type { SchuelerAbschnitt, SvwsPruefungsordnung } from '@/services/svwsService'
 import { ordneRechenKuerzelZu } from '@/services/prognoseEingabe'
+import { toAppError } from '@/services/errorService'
+import { isAxiosError } from 'axios'
 import { ABSCHLUSS_KURZ, APO_SI20_PO, abschlussZuKatalogId, abschlussZuSchild, abschlussartZuSchild, istAOSF, istApoSI20 } from '@/services/schildAbschluss'
 import type { FachDaten } from '@/models/Fach'
 import type { SvwsAbschlussdaten, SvwsLernabschnittsdaten } from '@/models/Lernabschnitt'
@@ -372,6 +379,16 @@ const selectedAbschnittId = ref<number | null>(abschnittStore.ausgewaehltId)
 
 const rawLernabschnitt = ref<SvwsLernabschnittsdaten | null>(null)
 const rawAbschlussdaten = ref<SvwsAbschlussdaten | null>(null)
+// Abschnitte, in denen der Schüler einen Lernabschnitt hat (mit damaligem Jahrgang/Klasse)
+const schuelerAbschnitte = ref<SchuelerAbschnitt[]>([])
+const schuelerAbschnitteFuer = ref<number | null>(null)
+// Abschnitt ≠ aktueller Abschnitt der Schule: nur ansehen, nichts speichern
+const nurAnsehen = computed(() =>
+  selectedAbschnittId.value !== null && selectedAbschnittId.value !== abschnittStore.ausgewaehltId
+)
+const aktuellerAbschnitt = computed(() =>
+  schuelerAbschnitte.value.find(a => a.abschnittId === selectedAbschnittId.value) ?? null
+)
 const abschlussNichtUnterstuetzt = ref<string | null>(null)
 const pruefungsordnungen = ref<SvwsPruefungsordnung[]>([])
 const selectedPO = ref<string | null>('APO-SI20')
@@ -423,6 +440,11 @@ const apoSI20Option = computed(() => {
 const istAOSFSchueler = computed(() => istAOSF(rawLernabschnitt.value?.pruefungsOrdnung))
 const poOptionen = computed(() => {
   const gespeichertePO = rawLernabschnitt.value?.pruefungsOrdnung
+  if (nurAnsehen.value) {
+    if (!gespeichertePO) return []
+    const po = pruefungsordnungen.value.find(p => p.pruefungsOrdnung === gespeichertePO)
+    return [{ value: gespeichertePO, label: po?.bezeichnung ?? gespeichertePO }]
+  }
   if (!istAOSFSchueler.value || !gespeichertePO) return [apoSI20Option.value]
   const po = pruefungsordnungen.value.find(p => p.pruefungsOrdnung === gespeichertePO)
   return [{ value: gespeichertePO, label: po?.bezeichnung ?? gespeichertePO }, apoSI20Option.value]
@@ -455,7 +477,7 @@ const neueFaecherVorhanden = computed(() => faecher.value.some(f => f.svwsId ===
 
 const hasChanges = computed(() => {
   const la = rawLernabschnitt.value
-  if (!la) return false
+  if (!la || nurAnsehen.value) return false
   if (selectedPO.value !== la.pruefungsOrdnung) return true
   if (istAbschlussPrognose.value !== (la.istAbschlussPrognose ?? !istAbschlussPrognose.value)) return true
   if (faecherGeloescht.value) return true
@@ -464,9 +486,17 @@ const hasChanges = computed(() => {
   return notenGeaendert.value
 })
 
-const abschnittOptionen = computed(() =>
-  abschnittStore.abschnitte.map(a => ({ label: a.bezeichnung, value: a.id }))
-)
+// Nur Abschnitte, in denen der Schüler einen Lernabschnitt in Jg. 8–10 hat (nur dafür rechnet
+// die Engine; für frühe Abschnitte liefert der Server teils auch 500)
+const PROGNOSE_JAHRGAENGE = ['8', '9', '10']
+const abschnittOptionen = computed(() => {
+  const vorhanden = new Set(schuelerAbschnitte.value
+    .filter(a => PROGNOSE_JAHRGAENGE.includes(a.jahrgang) || a.abschnittId === selectedAbschnittId.value)
+    .map(a => a.abschnittId))
+  return abschnittStore.abschnitte
+    .filter(a => vorhanden.size === 0 || vorhanden.has(a.id))
+    .map(a => ({ label: a.bezeichnung, value: a.id }))
+})
 
 const notenModusOptionen = [
   { label: 'Halbjahr', value: 'halbjahr' },
@@ -498,6 +528,7 @@ const schuelerName = computed(() => {
 })
 
 const schuelerKlasse = computed(() => {
+  if (aktuellerAbschnitt.value) return aktuellerAbschnitt.value.klasse
   const s = schuelerStore.schueler.find(s => s.id === schuelerId.value)
   return s?.klasseKuerzel ?? null
 })
@@ -515,6 +546,13 @@ function pruefeUndNavigiere(navFn: () => void) {
     return
   }
   navFn()
+}
+
+// Zurück in die Liste, aus der der Schüler kommt (nicht in den Jahrgang eines früheren Abschnitts)
+function zurSchuelerliste() {
+  const jg = schuelerStore.schueler.find(s => s.id === schuelerId.value)?.jahrgang ?? jahrgang.value
+  if (jg) router.push({ name: 'jahrgang', params: { jg } })
+  else router.push({ name: 'dashboard' })
 }
 
 function navigiereZuNaechstem() {
@@ -555,7 +593,23 @@ watch(notenModus, () => {
   })))
 })
 
-watch(schuelerId, () => laden())
+// Neuer Schüler: wieder mit dem Abschnitt der Schülerliste beginnen
+watch(schuelerId, () => {
+  selectedAbschnittId.value = abschnittStore.ausgewaehltId
+  laden()
+})
+
+// Nach einem Fehler nichts vom vorher geladenen Lernabschnitt stehen lassen, sonst könnte
+// "Speichern" in den falschen Lernabschnitt schreiben
+function setzeZurueck() {
+  rawLernabschnitt.value = null
+  rawAbschlussdaten.value = null
+  abschlussNichtUnterstuetzt.value = null
+  rohFaecher.value = []
+  faecher.value = []
+  lbnwNote.value = null
+  jahrgang.value = null
+}
 
 onMounted(() => {
   laden()
@@ -567,8 +621,18 @@ async function laden(abschnittIdParam?: number, nachSpeichern = false) {
   try {
     const abschnittId = abschnittIdParam ?? selectedAbschnittId.value
     if (!abschnittId) throw new Error('Kein Schuljahresabschnitt verfügbar.')
+    // Wechsel hier gilt nur für diesen Schüler; der Abschnitt der Schülerliste bleibt
     selectedAbschnittId.value = abschnittId
-    abschnittStore.waehleAbschnitt(abschnittId)
+
+    if (schuelerAbschnitteFuer.value !== schuelerId.value) {
+      schuelerAbschnitte.value = await loadSchuelerAbschnitte(schuelerId.value)
+      schuelerAbschnitteFuer.value = schuelerId.value
+    }
+    const schuelerAbschnitt = aktuellerAbschnitt.value
+    if (!schuelerAbschnitt) {
+      const bezeichnung = abschnittStore.abschnitte.find(a => a.id === abschnittId)?.bezeichnung ?? 'diesem Abschnitt'
+      throw new Error(`Für ${schuelerName.value} gibt es in ${bezeichnung} keinen Lernabschnitt.`)
+    }
 
     await faecherStore.ensureLoaded()
 
@@ -585,11 +649,11 @@ async function laden(abschnittIdParam?: number, nachSpeichern = false) {
     abschlussNichtUnterstuetzt.value = abschluss.nichtUnterstuetzt
     lbnwNote.value = lernabschnitt.noteLernbereichNW
 
-    const schueler = schuelerStore.schueler.find(s => s.id === schuelerId.value)
-    jahrgang.value = schueler?.jahrgang ?? null
+    jahrgang.value = schuelerAbschnitt.jahrgang || null
 
-    // Prüfungsordnung: APO-SI20, da nur diese angeboten und berechnet wird; AOSF bleibt stehen
-    selectedPO.value = istAOSF(lernabschnitt.pruefungsOrdnung)
+    // Prüfungsordnung: APO-SI20, da nur diese angeboten und berechnet wird; AOSF bleibt stehen.
+    // Früherer Abschnitt: gespeicherte Werte unverändert anzeigen.
+    selectedPO.value = nurAnsehen.value || istAOSF(lernabschnitt.pruefungsOrdnung)
       ? lernabschnitt.pruefungsOrdnung
       : apoSI20Option.value.value
 
@@ -597,7 +661,7 @@ async function laden(abschnittIdParam?: number, nachSpeichern = false) {
     // Abschluss der tatsächliche. Gilt auch, wenn ein anderer Wert gespeichert ist; manuell
     // änderbar. Nach dem Speichern bleibt der gerade gespeicherte Wert stehen.
     const abschnittNr = abschnittStore.abschnitte.find(a => a.id === abschnittId)?.abschnitt
-    istAbschlussPrognose.value = nachSpeichern && lernabschnitt.istAbschlussPrognose !== null
+    istAbschlussPrognose.value = (nachSpeichern || nurAnsehen.value) && lernabschnitt.istAbschlussPrognose !== null
       ? lernabschnitt.istAbschlussPrognose
       : !(Number(jahrgang.value) === 10 && abschnittNr === 2)
 
@@ -632,7 +696,10 @@ async function laden(abschnittIdParam?: number, nachSpeichern = false) {
     })))
 
   } catch (e: any) {
-    fehler.value = e?.message ?? 'Prognosedaten konnten nicht geladen werden.'
+    setzeZurueck()
+    fehler.value = isAxiosError(e)
+      ? toAppError(e, 'PrognoseView.laden').messageUser
+      : e?.message ?? 'Prognosedaten konnten nicht geladen werden.'
   } finally {
     laedt.value = false
   }
@@ -671,7 +738,7 @@ function verwerfenNoten() {
 }
 
 async function doSpeichern() {
-  if (!rawLernabschnitt.value) return
+  if (!rawLernabschnitt.value || nurAnsehen.value) return
   speichert.value = true
   speichernFehler.value = null
   try {

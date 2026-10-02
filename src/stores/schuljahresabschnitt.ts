@@ -5,6 +5,8 @@ import type { Schulstammdaten } from '@/models/Schueler'
 
 export const useSchuljahresabschnittStore = defineStore('schuljahresabschnitt', () => {
   const abschnitte = ref<Schuljahresabschnitt[]>([])
+  // Immer der aktuelle Abschnitt aus den Schulstammdaten. Listen und Auswertungen zeigen nur
+  // ihn; ein anderer Abschnitt wird nur in der PrognoseView lokal für einen Schüler gewählt.
   const ausgewaehltId = ref<number | null>(null)
 
   const ausgewaehlt = computed(() =>
@@ -28,14 +30,10 @@ export const useSchuljahresabschnittStore = defineStore('schuljahresabschnitt', 
     if (aktuell) ausgewaehltId.value = aktuell.id
   }
 
-  function waehleAbschnitt(id: number): void {
-    ausgewaehltId.value = id
-  }
-
   function clear(): void {
     abschnitte.value = []
     ausgewaehltId.value = null
   }
 
-  return { abschnitte, ausgewaehltId, ausgewaehlt, setFromStammdaten, setAbschnitte, waehleAbschnitt, clear }
+  return { abschnitte, ausgewaehltId, ausgewaehlt, setFromStammdaten, setAbschnitte, clear }
 })

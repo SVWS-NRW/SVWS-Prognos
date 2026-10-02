@@ -4,15 +4,7 @@
       <Button icon="pi pi-arrow-left" text size="small" @click="router.back()" />
       <span class="toolbar-title">Auswertungen</span>
       <div class="toolbar-sep" />
-      <Select
-        v-model="selectedAbschnittId"
-        :options="abschnittOptionen"
-        option-label="label"
-        option-value="value"
-        size="small"
-        class="abschnitt-select"
-        @update:model-value="wechsleAbschnitt"
-      />
+      <span class="abschnitt-anzeige" title="Listen und Auswertungen zeigen immer den aktuellen Schuljahresabschnitt">{{ abschnittStore.ausgewaehlt?.bezeichnung ?? '–' }}</span>
       <Button icon="pi pi-refresh" text size="small" title="Neu laden" :loading="schuelerStore.abschlussLaedt" @click="neuLaden" />
       <ThemeToggle />
     </div>
@@ -205,7 +197,6 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
-import Select from 'primevue/select'
 import Message from 'primevue/message'
 import Tabs from 'primevue/tabs'
 import TabList from 'primevue/tablist'
@@ -226,7 +217,6 @@ const abschnittStore = useSchuljahresabschnittStore()
 const laedt = ref(false)
 const fehler = ref<string | null>(null)
 const aktiverTab = ref('verteilung')
-const selectedAbschnittId = ref<number | null>(abschnittStore.ausgewaehltId)
 
 // Spaltenbreiten: Nachname, Vorname, Klasse, Jg., [Abschluss]
 const spaltenBreitenRisiko = ref([240, 200, 110, 70, 140])
@@ -255,10 +245,6 @@ function onMouseUp() {
   document.body.style.userSelect = ''
   document.body.style.cursor = ''
 }
-
-const abschnittOptionen = computed(() =>
-  abschnittStore.abschnitte.map(a => ({ label: a.bezeichnung, value: a.id }))
-)
 
 // ---------------------------------------------------------------------------
 // Abschluss-Hilfsfunktionen
@@ -318,7 +304,8 @@ function zaehleKategorien(liste: typeof schuelerStore.schueler): Omit<KlassenZei
 const AUSWERTUNG_JAHRGAENGE = ['8', '9', '10']
 const STATUS_AKTIV = 2
 const relevanteSchueler = computed(() =>
-  schuelerStore.schueler.filter(s => s.status === STATUS_AKTIV && AUSWERTUNG_JAHRGAENGE.includes(s.jahrgang))
+  schuelerStore.schueler.filter(s =>
+    s.status === STATUS_AKTIV && AUSWERTUNG_JAHRGAENGE.includes(s.jahrgang) && !s.svwsKeinLernabschnitt)
 )
 
 const verteilungNachJahrgang = computed((): JahrgangGruppe[] => {
@@ -407,11 +394,6 @@ async function laden(abschnittId: number, neu = false) {
   }
 }
 
-async function wechsleAbschnitt(id: number) {
-  abschnittStore.waehleAbschnitt(id)
-  await laden(id)
-}
-
 async function neuLaden() {
   const id = abschnittStore.ausgewaehltId
   if (id) await laden(id, true)
@@ -425,7 +407,6 @@ onMounted(async () => {
     fehler.value = 'Kein Schuljahresabschnitt verfügbar.'
     return
   }
-  selectedAbschnittId.value = abschnittId
   await laden(abschnittId)
 })
 
@@ -451,7 +432,7 @@ onUnmounted(() => {
 }
 .toolbar-title { font-size: 1.05rem; font-weight: 600; }
 .toolbar-sep { flex: 1; }
-.abschnitt-select { width: 16rem; }
+.abschnitt-anzeige { font-size: 0.9rem; color: var(--p-text-muted-color); white-space: nowrap; }
 
 .status-hint {
   display: flex;

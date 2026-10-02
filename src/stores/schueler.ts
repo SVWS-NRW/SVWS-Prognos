@@ -14,7 +14,7 @@ const PARALLEL = 10
 // Schulen aber der Großteil der Auswahlliste
 const AUSGEBLENDETE_STATUS = [8, 9, 10]
 
-type AbschlussInfo = Pick<Schueler, 'svwsAbschluss' | 'svwsIstAbschlussPrognose' | 'svwsPruefungsOrdnung'>
+type AbschlussInfo = Pick<Schueler, 'svwsAbschluss' | 'svwsIstAbschlussPrognose' | 'svwsPruefungsOrdnung' | 'svwsKeinLernabschnitt'>
 
 export const useSchuelerStore = defineStore('schueler', () => {
   const klassen = ref<Klasse[]>([])
@@ -162,13 +162,14 @@ export const useSchuelerStore = defineStore('schueler', () => {
   }
 })
 
-const KEIN_LERNABSCHNITT: AbschlussInfo = { svwsAbschluss: null, svwsIstAbschlussPrognose: null, svwsPruefungsOrdnung: null }
+const KEIN_LERNABSCHNITT: AbschlussInfo = { svwsAbschluss: null, svwsIstAbschlussPrognose: null, svwsPruefungsOrdnung: null, svwsKeinLernabschnitt: true }
 
 function abschlussInfo(la: SvwsLernabschnittsdaten): AbschlussInfo {
   return {
     svwsAbschluss: la.abschluss,
     svwsIstAbschlussPrognose: la.istAbschlussPrognose,
     svwsPruefungsOrdnung: la.pruefungsOrdnung,
+    svwsKeinLernabschnitt: false,
   }
 }
 
