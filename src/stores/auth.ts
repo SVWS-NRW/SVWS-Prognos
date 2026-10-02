@@ -3,6 +3,8 @@ import { defineStore } from 'pinia'
 import { createApiClient, destroyApiClient } from '@/services/apiClient'
 import { loadSchulstammdaten } from '@/services/svwsService'
 import { useSchuljahresabschnittStore } from './schuljahresabschnitt'
+import { useSchuelerStore } from './schueler'
+import { useFaecherStore } from './faecher'
 import type { Schulform } from '@/rules/types'
 
 export interface AuthConfig {
@@ -46,6 +48,8 @@ export const useAuthStore = defineStore('auth', () => {
     destroyApiClient()
     const abschnittStore = useSchuljahresabschnittStore()
     abschnittStore.clear()
+    useSchuelerStore().clear()
+    useFaecherStore().clear()
     baseUrl.value = ''
     schema.value = ''
     username.value = ''

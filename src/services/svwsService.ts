@@ -87,13 +87,24 @@ export async function loadSvwsLernabschnittsdaten(
   schuelerId: number,
   abschnittId: number,
 ): Promise<SvwsLernabschnittsdaten> {
+  const la = await loadSvwsLernabschnittsdatenOderNull(schuelerId, abschnittId)
+  if (!la) throw new Error('Keine Lernabschnittsdaten gefunden.')
+  return la
+}
+
+// null, wenn der Schüler im Abschnitt keinen Lernabschnitt hat (z.B. Ehemalige, die die
+// Auswahlliste trotzdem enthält; der Server liefert dann ein leeres Array)
+export async function loadSvwsLernabschnittsdatenOderNull(
+  schuelerId: number,
+  abschnittId: number,
+): Promise<SvwsLernabschnittsdaten | null> {
   const { data } = await getApiClient().get(
     `/schueler/lernabschnittsdaten/${schuelerId}/${abschnittId}`,
   )
   // API liefert ein Array — primärer Abschnitt hat wechselNr = 0
   const list: any[] = Array.isArray(data) ? data : [data]
   const entry = list.find(e => e.wechselNr === 0) ?? list[0]
-  if (!entry) throw new Error('Keine Lernabschnittsdaten gefunden.')
+  if (!entry) return null
   return {
     id: entry.id,
     schuelerID: entry.schuelerID,

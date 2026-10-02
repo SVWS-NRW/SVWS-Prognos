@@ -13,6 +13,7 @@
         class="abschnitt-select"
         @update:model-value="wechsleAbschnitt"
       />
+      <Button icon="pi pi-refresh" text size="small" title="Neu laden" :loading="schuelerStore.abschlussLaedt" @click="neuLaden" />
       <Select
         v-model="selectedStatus"
         :options="statusOptionen"
@@ -114,7 +115,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import Select from 'primevue/select'
@@ -209,19 +210,12 @@ onMounted(async () => {
   window.addEventListener('mousemove', onMouseMove)
   window.addEventListener('mouseup', onMouseUp)
 
-  laedt.value = true
-  fehler.value = null
-  try {
-    const abschnittId = abschnittStore.ausgewaehltId
-    if (!abschnittId) throw new Error('Kein Schuljahresabschnitt verfügbar.')
-    await schuelerStore.loadFuerAbschnitt(abschnittId, jg)
-    // Abschlussdaten im Hintergrund nachladen
-    schuelerStore.ladeAbschlussDaten(abschnittId)
-  } catch (e: any) {
-    fehler.value = e?.message ?? 'Schülerdaten konnten nicht geladen werden.'
-  } finally {
-    laedt.value = false
+  const abschnittId = abschnittStore.ausgewaehltId
+  if (!abschnittId) {
+    fehler.value = 'Kein Schuljahresabschnitt verfügbar.'
+    return
   }
+  await laden(abschnittId, false)
 })
 
 onUnmounted(() => {
@@ -251,22 +245,43 @@ function formatPruefungsordnung(s: { svwsPruefungsOrdnung?: string | null; svwsA
 
 function formatPrognose(s: { svwsIstAbschlussPrognose?: boolean | null }): string {
   if (s.svwsIstAbschlussPrognose === undefined) return '…'
+  if (s.svwsIstAbschlussPrognose === null) return '–'
   return s.svwsIstAbschlussPrognose ? 'P' : '✓'
 }
 
 async function wechsleAbschnitt(id: number) {
   abschnittStore.waehleAbschnitt(id)
   selectedKlasseId.value = null
+  await laden(id, false)
+}
+
+async function neuLaden() {
+  const id = abschnittStore.ausgewaehltId
+  if (id) await laden(id, true)
+}
+
+async function laden(id: number, neu: boolean) {
   laedt.value = true
   fehler.value = null
   try {
-    await schuelerStore.loadFuerAbschnitt(id, jg)
+    await schuelerStore.loadFuerAbschnitt(id, jg, neu)
+    ladeSichtbare()
   } catch (e: any) {
     fehler.value = e?.message ?? 'Schülerdaten konnten nicht geladen werden.'
   } finally {
     laedt.value = false
   }
 }
+
+// Abschlussdaten nur für die gefilterten Schüler im Hintergrund nachladen (nur, was noch nicht
+// zwischengespeichert ist). Ohne Statusfilter enthält die Liste auch alle Ehemaligen.
+function ladeSichtbare() {
+  const id = abschnittStore.ausgewaehltId
+  if (id) schuelerStore.ladeAbschlussDaten(id, gefiltert.value.map(s => s.id))
+}
+
+// Nur auf die Filter reagieren: gefiltert selbst ändert sich bei jedem übernommenen Ergebnis
+watch([selectedStatus, selectedKlasseId], ladeSichtbare)
 
 function navigiereZurPrognose(schuelerId: number) {
   schuelerStore.waehleSchueler(schuelerId)

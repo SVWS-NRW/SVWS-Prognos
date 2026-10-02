@@ -13,6 +13,7 @@
         class="abschnitt-select"
         @update:model-value="wechsleAbschnitt"
       />
+      <Button icon="pi pi-refresh" text size="small" title="Neu laden" :loading="schuelerStore.abschlussLaedt" @click="neuLaden" />
       <ThemeToggle />
     </div>
 
@@ -312,9 +313,17 @@ function zaehleKategorien(liste: typeof schuelerStore.schueler): Omit<KlassenZei
   return { oa, esa, eesa, msa, msaQ, offen, gesamt: liste.length }
 }
 
+// Ausgewertet werden aktive Schüler der Prognose-Jahrgänge. Die Auswahlliste enthält sonst auch
+// Ehemalige und alle übrigen Jahrgänge (in großen Schulen mehrere tausend Einträge).
+const AUSWERTUNG_JAHRGAENGE = ['8', '9', '10']
+const STATUS_AKTIV = 2
+const relevanteSchueler = computed(() =>
+  schuelerStore.schueler.filter(s => s.status === STATUS_AKTIV && AUSWERTUNG_JAHRGAENGE.includes(s.jahrgang))
+)
+
 const verteilungNachJahrgang = computed((): JahrgangGruppe[] => {
   // Nur Schüler einbeziehen, deren Abschlussdaten geladen sind
-  const geladen = schuelerStore.schueler.filter(s => s.svwsAbschluss !== undefined)
+  const geladen = relevanteSchueler.value.filter(s => s.svwsAbschluss !== undefined)
   const jahrgaenge = [...new Set(geladen.map(s => s.jahrgang))].sort((a, b) => Number(a) - Number(b))
 
   return jahrgaenge.map(jg => {
@@ -335,7 +344,7 @@ const verteilungNachJahrgang = computed((): JahrgangGruppe[] => {
 const RISIKO_REIHENFOLGE: AbschlussKat[] = ['OA', 'ESA', 'EESA']
 
 const risikofaelle = computed(() =>
-  schuelerStore.schueler
+  relevanteSchueler.value
     .filter(s => {
       const kat = svwsZuKat(s.svwsAbschluss)
       return s.svwsAbschluss !== undefined && RISIKO_REIHENFOLGE.includes(kat)
@@ -354,7 +363,7 @@ const risikofaelle = computed(() =>
 // ---------------------------------------------------------------------------
 
 const offenePrognosen = computed(() =>
-  schuelerStore.schueler
+  relevanteSchueler.value
     .filter(s => s.svwsIstAbschlussPrognose !== undefined && s.svwsIstAbschlussPrognose !== true)
     .sort((a, b) =>
       Number(a.jahrgang) - Number(b.jahrgang) ||
@@ -367,12 +376,12 @@ const offenePrognosen = computed(() =>
 // Navigation
 // ---------------------------------------------------------------------------
 
-// Statusfilter 'alle', weil die Verteilung Schüler aller Status zählt
+// Die Schülerliste filtert standardmäßig auf aktive Schüler, wie die Auswertung
 function navigiereZurKlasse(jahrgang: string, klasseId: number | null) {
   router.push({
     name: 'jahrgang',
     params: { jg: jahrgang },
-    query: { ...(klasseId !== null ? { klasse: String(klasseId) } : {}), status: 'alle' },
+    query: klasseId !== null ? { klasse: String(klasseId) } : {},
   })
 }
 
@@ -385,12 +394,12 @@ function navigiereZurPrognose(schuelerId: number) {
 // Laden
 // ---------------------------------------------------------------------------
 
-async function laden(abschnittId: number) {
+async function laden(abschnittId: number, neu = false) {
   laedt.value = true
   fehler.value = null
   try {
-    await schuelerStore.loadFuerAbschnitt(abschnittId, null)
-    schuelerStore.ladeAbschlussDaten(abschnittId)
+    await schuelerStore.loadFuerAbschnitt(abschnittId, null, neu)
+    schuelerStore.ladeAbschlussDaten(abschnittId, relevanteSchueler.value.map(s => s.id))
   } catch (e: any) {
     fehler.value = e?.message ?? 'Schülerdaten konnten nicht geladen werden.'
   } finally {
@@ -401,6 +410,11 @@ async function laden(abschnittId: number) {
 async function wechsleAbschnitt(id: number) {
   abschnittStore.waehleAbschnitt(id)
   await laden(id)
+}
+
+async function neuLaden() {
+  const id = abschnittStore.ausgewaehltId
+  if (id) await laden(id, true)
 }
 
 onMounted(async () => {

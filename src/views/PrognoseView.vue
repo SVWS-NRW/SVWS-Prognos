@@ -561,7 +561,7 @@ onMounted(() => {
   laden()
 })
 
-async function laden(abschnittIdParam?: number) {
+async function laden(abschnittIdParam?: number, nachSpeichern = false) {
   laedt.value = true
   fehler.value = null
   try {
@@ -579,6 +579,7 @@ async function laden(abschnittIdParam?: number) {
         : Promise.resolve(),
     ])
     rawLernabschnitt.value = lernabschnitt
+    schuelerStore.aktualisiereAbschluss(abschnittId, lernabschnitt)
     const abschluss = await loadAbschlussdaten(lernabschnitt.id)
     rawAbschlussdaten.value = abschluss.daten
     abschlussNichtUnterstuetzt.value = abschluss.nichtUnterstuetzt
@@ -592,10 +593,13 @@ async function laden(abschnittIdParam?: number) {
       ? lernabschnitt.pruefungsOrdnung
       : apoSI20Option.value.value
 
-    // Ist Prognose: immer, außer Jg. 10 im 2. Halbjahr — dort ist der berechnete Abschluss der
-    // tatsächliche. Gilt auch, wenn ein anderer Wert gespeichert ist; manuell weiter änderbar.
+    // Ist Prognose: beim Öffnen immer, außer Jg. 10 im 2. Halbjahr — dort ist der berechnete
+    // Abschluss der tatsächliche. Gilt auch, wenn ein anderer Wert gespeichert ist; manuell
+    // änderbar. Nach dem Speichern bleibt der gerade gespeicherte Wert stehen.
     const abschnittNr = abschnittStore.abschnitte.find(a => a.id === abschnittId)?.abschnitt
-    istAbschlussPrognose.value = !(Number(jahrgang.value) === 10 && abschnittNr === 2)
+    istAbschlussPrognose.value = nachSpeichern && lernabschnitt.istAbschlussPrognose !== null
+      ? lernabschnitt.istAbschlussPrognose
+      : !(Number(jahrgang.value) === 10 && abschnittNr === 2)
 
     const belegungen = lernabschnitt.leistungsdaten
       .map(ld => ({ ld, fach: faecherStore.faecherMap.get(ld.fachID) }))
@@ -716,7 +720,7 @@ async function doSpeichern() {
       await patchLeistungsdaten(rawLd.id, patchBody)
     }
 
-    await laden()
+    await laden(undefined, true)
   } catch (e: any) {
     speichernFehler.value = e?.message ?? 'Fehler beim Speichern.'
   } finally {
