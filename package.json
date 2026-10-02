@@ -1,6 +1,6 @@
 {
   "name": "svws-prognos",
-  "version": "0.3.3",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "main": "electron/main.cjs",
@@ -12,7 +12,9 @@
     "electron:dev": "npm run build && GSETTINGS_SCHEMA_DIR=$HOME/.local/share/electron-schemas electron . --no-sandbox --ozone-platform=x11",
     "electron:build": "npm run build && electron-builder",
     "electron:build:win": "npm run build && electron-builder --win nsis",
-    "release": "rm -rf release && npm run build && electron-builder --linux AppImage --win nsis; mkdir -p release && cd dist && zip -r ../release/SVWS-Prognos-$npm_package_version-webserver.zip ."
+    "release": "node scripts/release.mjs",
+    "release:build": "rm -rf release && npm run build && electron-builder --linux AppImage --win nsis --publish never && mkdir -p release && (cd dist && zip -r ../release/SVWS-Prognos-$npm_package_version-webserver.zip .)",
+    "release:github": "gh release create v$npm_package_version --draft --title \"Release $npm_package_version\" --notes \"\" release/SVWS-Prognos-$npm_package_version.AppImage release/SVWS-Prognos-Setup-$npm_package_version.exe release/SVWS-Prognos-$npm_package_version-webserver.zip"
   },
   "build": {
     "appId": "de.skinwalker.svws-prognos",
@@ -35,7 +37,7 @@
       "icon": "build/icon.png"
     },
     "nsis": {
-      "artifactName": "${productName}-Setup-${version}.${ext}",
+      "artifactName": "SVWS-Prognos-Setup-${version}.${ext}",
       "oneClick": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,

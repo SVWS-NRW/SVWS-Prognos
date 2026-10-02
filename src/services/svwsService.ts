@@ -1,7 +1,7 @@
 import { getApiClient } from './apiClient'
 import type { Schulstammdaten, SvwsSchuelerListeEintrag, SvwsKlasse, Klasse, Schueler } from '@/models/Schueler'
 import type { NotenbildSchueler } from '@/models/Lernabschnitt'
-import type { SvwsLernabschnittsdaten } from '@/models/Lernabschnitt'
+import type { SvwsAbschlussdaten, SvwsLernabschnittsdaten } from '@/models/Lernabschnitt'
 import type { GEAbschlussFaecher } from '@/models/GEAbschluss'
 import type { FachDaten } from '@/models/Fach'
 
@@ -100,6 +100,7 @@ export async function loadSvwsLernabschnittsdaten(
     noteLernbereichNW: entry.noteLernbereichNW ?? null,
     noteLernbereichGSbzwAL: entry.noteLernbereichGSbzwAL ?? null,
     abschluss: entry.abschluss ?? null,
+    abschlussart: entry.abschlussart ?? null,
     istAbschlussPrognose: entry.istAbschlussPrognose ?? null,
     pruefungsOrdnung: entry.pruefungsOrdnung ?? null,
     leistungsdaten: (entry.leistungsdaten ?? []).map((l: any) => ({
@@ -115,19 +116,20 @@ export async function loadSvwsLernabschnittsdaten(
 export interface SvwsPruefungsordnung {
   // Voller Identifier, z.B. "GE/APO-SI20/5-10"
   pruefungsOrdnung: string
-  // Abschluss-Code für diesen Eintrag, z.B. "MSA-Q"
-  abschluss: string | null
   bezeichnung: string | null
 }
 
-export async function loadPruefungsordnungen(): Promise<SvwsPruefungsordnung[]> {
+// Der Katalog enthält die Prüfungsordnungen aller Schulformen. Die Schulform steht in
+// PO_Schulform (z.B. "GE", "SK", "PS"); GE, SK und PS teilen sich dasselbe PO_Krz.
+export async function loadPruefungsordnungen(schulformKuerzel: string): Promise<SvwsPruefungsordnung[]> {
   try {
     const { data } = await getApiClient().get('/schild3/pruefungsordnungen')
-    return (Array.isArray(data) ? data : []).map((po: any) => ({
-      pruefungsOrdnung: String(po.pruefungsOrdnung ?? po.kuerzel ?? po.id ?? ''),
-      abschluss: po.abschluss ? String(po.abschluss) : null,
-      bezeichnung: po.bezeichnung ?? po.text ?? null,
-    }))
+    return (Array.isArray(data) ? data : [])
+      .filter((po: any) => po?.PO_Schulform === schulformKuerzel && po.PO_Krz)
+      .map((po: any) => ({
+        pruefungsOrdnung: String(po.PO_Krz),
+        bezeichnung: po.PO_Name ?? null,
+      }))
   } catch {
     return []
   }
@@ -139,6 +141,35 @@ export async function patchLernabschnittsdaten(
 ): Promise<void> {
   const body = Object.fromEntries(Object.entries(felder).filter(([, v]) => v !== null && v !== undefined))
   await getApiClient().patch(`/schueler/lernabschnittsdaten/${id}`, body)
+}
+
+function mapAbschlussdaten(data: any): SvwsAbschlussdaten {
+  return {
+    idLernabschnitt: data.idLernabschnitt,
+    pruefungsordnung: data.pruefungsordnung ?? null,
+    idAbschluss: data.idAbschluss ?? null,
+    istAbschlussPrognose: data.istAbschlussPrognose ?? null,
+    idAbschlussart: data.idAbschlussart ?? null,
+    textErgebnisPruefungsalgorithmus: data.textErgebnisPruefungsalgorithmus ?? null,
+    idAbschlussQuartalsprognose: data.idAbschlussQuartalsprognose ?? null,
+    textErgebniseQuartalsprognose: data.textErgebniseQuartalsprognose ?? null,
+  }
+}
+
+export async function loadAbschlussdaten(lernabschnittId: number): Promise<SvwsAbschlussdaten> {
+  const { data } = await getApiClient().get(`/abschluesse/schueler/lernabschnittsdaten/${lernabschnittId}`)
+  return mapAbschlussdaten(data)
+}
+
+// Schreibt die Abschlussfelder; der Server setzt daraus u.a. 'abschluss' (Schild-Kürzel) und
+// 'abschlussart' der Lernabschnittsdaten. 'pruefungsordnung' erwartet hier bewusst die Kurzform
+// ('APO-SI20'); sie wird vorerst weiter in Langform über patchLernabschnittsdaten() gesetzt.
+export async function patchAbschlussdaten(
+  lernabschnittId: number,
+  felder: Partial<Omit<SvwsAbschlussdaten, 'idLernabschnitt' | 'pruefungsordnung'>>,
+): Promise<SvwsAbschlussdaten> {
+  const { data } = await getApiClient().patch(`/abschluesse/schueler/lernabschnittsdaten/${lernabschnittId}`, felder)
+  return mapAbschlussdaten(data)
 }
 
 export async function patchLeistungsdaten(

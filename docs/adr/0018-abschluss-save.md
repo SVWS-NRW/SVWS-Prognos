@@ -91,29 +91,64 @@ PM2 zusätzlich Einzelnoten zurück:
 Die Konvertierung zwischen PM2-Kürzeln und SchILD-Feldwerten übernimmt
 `PMAbschlusstoSchILDAbschluss()` in `Shared/BaseUtils.pas:4081`.
 
-## Ziel-Implementierung in SVWS-Prognos
+## Umsetzung in SVWS-Prognos
 
-```typescript
-// svwsService.ts — Entwurf
-async function speichereAbschlussPrognose(
-  lernabschnittId: number,
-  prognose: AbschlussTyp,       // 'OA' | 'ESA' | 'EESA' | 'MSA' | 'MSA_Q'
-  pruefAlgoErgebnis: string,
-  gesamtnoteNW?: string,
-  moeglNPFaecher?: string,
-): Promise<void> {
-  const abschluss = abschlussTypToSchild(prognose); // z.B. 'GE/APO-SI20/MSA'
-  await apiClient.patch(`/lernabschnittsdaten/${lernabschnittId}`, {
-    abschluss,
-    abschlIstPrognose: true,     // PFLICHT — ohne dieses Flag gilt es als Endabschluss
-    pruefAlgoErgebnis,
-    gesamtnoteNW,
-    moeglNPFaecher,
-  });
-}
-```
+`PrognoseView.doSpeichern()` schreibt in zwei Schritten, Zuordnung zentral in `services/schildAbschluss.ts`:
 
-Die Abbildungsfunktion `abschlussTypToSchild()` entspricht `PMAbschlusstoSchILDAbschluss()`.
+1. `PATCH /db/{schema}/schueler/lernabschnittsdaten/{id}` — Prüfungsordnung, Prognose-Flag, LBNW.
+2. `PATCH /db/{schema}/abschluesse/schueler/lernabschnittsdaten/{id}` — der Abschluss selbst.
+   Erst nach Schritt 1, weil der Server den Abschluss gegen die Prüfungsordnung prüft.
+
+| SVWS-Feld | Endpunkt | Wert | PM2/SchILD-Entsprechung |
+|---|---|---|---|
+| `pruefungsOrdnung` | 1 | gewählte Prüfungsordnung (`GE/APO-SI20/5-10`) | – |
+| `istAbschlussPrognose` | 1 | Checkbox „Ist Prognose“: beim Laden gesetzt, außer Jg. 10 im 2. Halbjahr (dann tatsächlicher Abschluss); gespeicherter Wert wird nicht übernommen, manuell änderbar | `AbschlIstPrognose` |
+| `noteLernbereichNW` | 1 | nur bei Änderung | `Gesamtnote_NW` |
+| `idAbschluss` | 2 | Katalog-ID: OA `0` · ESA `2001` · EESA `5001` · MSA `10000` · MSA-Q `11000` | `Abschluss` |
+| `idAbschlussart` | 2 | `1` = Abschluss erreicht, `2` = ohne Abschluss (OA) | `AbschlussArt` |
+| `textErgebnisPruefungsalgorithmus` | 2 | Kopfzeile + Berechnungsprotokoll als Text | `PruefAlgoErgebnis` |
+| `idAbschlussQuartalsprognose` | 2 | statt `idAbschluss`, wenn mit Quartalsnoten gerechnet wurde | – |
+| `textErgebniseQuartalsprognose` | 2 | statt `textErgebnisPruefungsalgorithmus` bei Quartalsnoten | – |
+
+- Die Katalog-IDs stammen aus dem ASD-Katalog `SchulabschlussAllgemeinbildend`
+  (`data/openAPI/allinone.json`, Einträge gültig ab Schuljahr 2022). Ältere Einträge (HA9 = `2000`,
+  HA10 = `5000`) werden nicht gebraucht, da es Jg. 8 nach APO-SI20 erst ab 2023/24 gibt.
+- Der Server leitet daraus das Schild-Feld `abschluss` der Lernabschnittsdaten ab
+  (`GE/APO-SI20/OA` · `/ESA` · `/EESA` · `/MSA` · `/MSAQ-E`) und setzt auch `abschlussart`.
+  Gelesen wird der gespeicherte Abschluss für Schülertabelle und Auswertungen weiter aus
+  `abschluss` über `schildZuAbschluss()`.
+- Prüfungsordnung: Der neue Endpunkt arbeitet bewusst mit der Kurzform (`APO-SI20`) und lehnt
+  die Langform `GE/APO-SI20/5-10` mit 400 ab. In der Datenbank speichert der Server weiterhin
+  Schild3-kompatibel (Langform in den Lernabschnittsdaten). Prognos setzt die Prüfungsordnung
+  vorerst über Schritt 1 und sendet sie am neuen Endpunkt nicht mit.
+- Geplant: Umstieg auf eine atomarere Speicherung, d.h. Prüfungsordnung (Kurzform), Prognose-Flag
+  und Abschluss in einem PATCH über `/abschluesse/…` statt zwei getrennter Aufrufe.
+- Verhalten des Servers (getestet gegen `1.5.0-SNAPSHOT`, Oktober 2026):
+  - Der PATCH antwortet mit 200 und den gespeicherten `Abschlussdaten`.
+  - Eine im Schuljahr ungültige `idAbschluss` wird ohne Fehler auf `null` gesetzt. Prognos
+    vergleicht deshalb die Antwort des PATCH mit dem gesendeten Wert und meldet sonst einen Fehler.
+  - `null` leert ein Feld (anfangs führte das zu 500, inzwischen im Server behoben).
+- Die Kürzel entsprechen `OP_Krz` aus `/schild3/pruefungsordnungen/optionen`. Gesamt-,
+  Sekundar- und Primusschule nutzen alle die Prüfungsordnung `GE/APO-SI20/5-10`. Die Schulform
+  steht nicht im Kürzel, sondern in `PO_Schulform` (`/schild3/pruefungsordnungen`) bzw.
+  `OP_Schulformen` (`/schild3/pruefungsordnungen/optionen`). Das Schulform-Kürzel der
+  Primusschule ist `PS`.
+- `loadPruefungsordnungen()` liest `PO_Krz`/`PO_Name` und filtert auf `PO_Schulform` der Schule,
+  weil der Katalog die Prüfungsordnungen aller Schulformen enthält.
+- Zur Auswahl steht nur APO-SI20, weil nur sie für die Jahrgänge 8–10 noch gültig ist und nur sie
+  von der Engine berechnet wird. Andere Prüfungsordnungen der Schulform (APO-SI05, AOSF-SI05,
+  AO-SI99 …) werden mit anderen Programmen berechnet. Beim Laden wird APO-SI20 vorausgewählt.
+- Ausnahme AOSF (sonderpädagogische Förderung, z.B. `S/AOSF-SI05/5-10`): Eine gespeicherte
+  AOSF-Prüfungsordnung bleibt ausgewählt, das Dropdown ist gesperrt, und Schritt 2 (Abschluss,
+  Abschlussart, Protokoll) entfällt. Ob eine Prognose bei Förderbedarf sinnvoll ist, ist offen.
+  Kommt eine neue APO-SI hinzu, muss sie hier angeboten werden (neues Regelwerk in der Engine,
+  `apoSI20Option`/`poOptionen` in `PrognoseView` und `istApoSI20()` in `schildAbschluss.ts` erweitern).
+- Der Abschluss wird nur geschrieben, wenn die gewählte Prüfungsordnung APO-SI20 ist,
+  weil die Engine nur APO-SI20 berechnet.
+- Nicht geschrieben werden `versetzungsvermerk` (eigene Berechnung, folgt später) und
+  `nachpruefungen.moegliche` (Nachprüfungsfächer berechnet die Engine noch nicht).
+- Gelesen werden gespeicherte Abschlüsse über `schildZuAbschluss()`, das auch die
+  APO-SI05-Kürzel (`HA`, `HA10`, `FOR`, `FORQ-E`) älterer Daten versteht.
 
 ## Konsequenzen
 

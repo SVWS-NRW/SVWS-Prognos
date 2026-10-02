@@ -53,14 +53,17 @@ src/
 ├── App.vue                  # Nur Toast + RouterView
 ├── style.css                # Design-Tokens (Light + Dark)
 ├── components/
-│   └── ThemeToggle.vue      # Floating-Button: System/Hell/Dunkel
+│   ├── ThemeToggle.vue      # Button: System/Hell/Dunkel (in jedem View-Header)
+│   └── LegalFooter.vue      # Hilfe-Link, Impressum- und Datenschutz-Modal (ConnectView)
 ├── composables/
 │   └── useTheme.ts          # Theme-State (preference: Ref<'system'|'light'|'dark'>)
 ├── models/                  # Reine TypeScript-Interfaces, kein State
 │   ├── AppError.ts
-│   ├── Lernabschnitt.ts     # NotenbildSchueler, Lernabschnitt, Leistung
+│   ├── Fach.ts              # FachDaten (id, kuerzel, kuerzelStatistik, istFremdsprache)
+│   ├── GEAbschluss.ts       # Antwort von prognose_leistungsdaten (nur Abgleich, s. u.)
+│   ├── Lernabschnitt.ts     # SvwsLernabschnittsdaten, SvwsLeistungsdaten, Leistung …
 │   ├── PrognoseErgebnis.ts  # AbschlussTyp, PrognoseErgebnis, PrognoseHinweis
-│   └── Schueler.ts          # Schueler, Klasse, Schuljahresabschnitt
+│   └── Schueler.ts          # Schulstammdaten, SvwsSchuelerListeEintrag, Schueler, Klasse …
 ├── rules/                   # Prognose-Engine (APO-SI20)
 │   ├── types.ts             # EingabeFach, RegelwerkInput, RegelwerkErgebnis
 │   ├── apoSI20.ts           # Vollständige APO-SI20-Implementierung
@@ -69,22 +72,27 @@ src/
 ├── router/index.ts          # Hash-History, Auth-Guard
 ├── services/
 │   ├── apiClient.ts         # Axios-Client (Basic Auth, Electron-/Browser-Proxy)
-│   ├── svwsService.ts       # SVWS-REST-Endpunkte (viele noch TODO)
+│   ├── svwsService.ts       # SVWS-REST-Aufrufe inkl. Mapping (lesen + PATCH/DELETE)
+│   ├── prognoseEingabe.ts   # Schul-Fachkürzel → Rechenkürzel der Engine (+ Test)
+│   ├── schildAbschluss.ts   # AbschlussTyp → Katalog-ID / Schild-Kürzel GE/APO-SI20/… (+ Test)
 │   └── errorService.ts      # toAppError(), useErrorService()
 ├── stores/
-│   ├── auth.ts              # baseUrl, schema, username, isConnected
-│   ├── prognose.ts          # notenbilder (Map), ergebnisse (Map)
-│   ├── schueler.ts          # klassen[], schueler[]
-│   └── schuljahresabschnitt.ts
+│   ├── auth.ts              # Verbindung, Schulform (GE/SK/PS), schulformUnterstuetzt
+│   ├── faecher.ts           # Fächerkatalog der Schule (/faecher), ensureLoaded()
+│   ├── schueler.ts          # Auswahlliste je Abschnitt + gespeicherte Abschlüsse
+│   ├── schuljahresabschnitt.ts
+│   └── prognose.ts          # notenbilder/ergebnisse (Map) — derzeit ungenutzt
 └── views/
-    ├── ConnectView.vue       # Login-Formular → authStore.connect()
-    ├── DashboardView.vue     # 6 Kacheln: Jg8/9/10, Manuell, Auswertungen, Schuldaten
-    ├── ManuellePrognoseView.vue  # ⭐ Hauptfeature, voll implementiert
-    ├── SchuelerauswahlView.vue   # Jahrgang-Filter + Klassenliste (Stub)
-    ├── AuswertungenView.vue      # Platzhalter
-    ├── NotenbildView.vue         # Platzhalter
-    ├── PrognoseView.vue          # Platzhalter
-    └── EinstellungenView.vue     # Platzhalter
+    ├── ConnectView.vue           # Login-Formular → authStore.connect()
+    ├── DashboardView.vue         # 6 Kacheln: Jg 8/9/10, Manuell, Auswertungen, Schuldaten
+    ├── SchuelerauswahlView.vue   # Schülertabelle je Jahrgang: Abschnitt-, Status-, Klassenfilter,
+    │                             # gespeicherter Abschluss/Prognose je Schüler
+    ├── PrognoseView.vue          # ⭐ Prognose eines Schülers aus SVWS-Daten: Halbjahr/Quartal,
+    │                             # Noten bearbeiten, Speichern (PATCH), Weiter zum nächsten Schüler
+    ├── ManuellePrognoseView.vue  # Prognose ohne Server-Daten (Formular / JSON-Import)
+    ├── AuswertungenView.vue      # Abschlussübersicht je Klasse/Jahrgang, Sprung zur Prognose
+    ├── NotenbildView.vue         # Platzhalter („Implementierung folgt“)
+    └── EinstellungenView.vue     # Platzhalter („Implementierung folgt“)
 ```
 
 ---
@@ -169,17 +177,18 @@ interface EingabeFach {
 ### Tests
 
 ```bash
-npx vitest run   # 78/78 Testfälle grün
+npx vitest run   # 3 Testdateien, 107 Tests grün (davon 78 APO-SI20-Fälle)
 ```
 
-Die Tests lesen automatisch alle `.json`/`.JSON`-Dateien aus `test-json/` (lokal,
-nicht eingecheckt). Format: `{ input: { jahrgang, faecher }, Prognose: { abschluss } }`.
+`apoSI20.test.ts` liest automatisch alle `.json`/`.JSON`-Dateien aus `test-json/`
+(eingecheckt, 78 Dateien). Format: `{ input: { jahrgang, faecher }, Prognose: { abschluss } }`.
+Dazu kommen `services/prognoseEingabe.test.ts` und `services/schildAbschluss.test.ts`.
 
 ---
 
 ## ManuellePrognoseView — Layout-Details
 
-Der aktuell vollständig implementierte View. Zwei-Spalten-Layout:
+Prognose ohne Server-Daten. Zwei-Spalten-Layout:
 
 ```
 Toolbar: [← Manuelle Prognose] [spacer] [Jahrgang ▼] [Schulform ▼] [ThemeToggle]
@@ -236,14 +245,50 @@ Im Production-Build (Electron) wird direkt per HTTPS verbunden.
 
 ---
 
+## SVWS-Schnittstelle: OpenAPI + Kataloge (`data/openAPI/`)
+
+Snapshots der Server-Schnittstelle — **erste Quelle**, bevor Endpunkte oder Feldnamen geraten werden.
+Beide Dateien sind eingecheckt, damit Server-Änderungen per `git diff` verfolgt werden können.
+
+| Datei | Inhalt | Quelle (lokaler SVWS-Server) |
+|---|---|---|
+| `server.json` | OpenAPI 3.0.1, `info.version` = Serverversion (Stand: `1.5.0-SNAPSHOT`, 774 Pfade, 543 Schemas) | `https://localhost:8443/openapi/server.json` |
+| `allinone.json` | 74 Kataloge als `{ <Name>: { version, daten: [{ bezeichner, historie: [{ id, kuerzel, text, gueltigVon, gueltigBis }] }] } }` | `https://localhost:8443/types/allinone.json` |
+
+```bash
+curl -k -o data/openAPI/server.json    https://localhost:8443/openapi/server.json
+curl -k -o data/openAPI/allinone.json  https://localhost:8443/types/allinone.json
+git diff --stat data/openAPI/
+```
+
+Nach einem Update prüfen, ob sich etwas für Prognos geändert hat:
+
+- **Genutzte Endpunkte** (in `server.json` alle unter `/db/{schema}`):
+  `/schule/stammdaten`, `/faecher`, `/schueler/abschnitt/{abschnitt}/auswahlliste`,
+  `/schueler/lernabschnittsdaten/{idSchueler}/{idSchuljahresabschnitt}` (GET),
+  `/schueler/lernabschnittsdaten/{id}` (PATCH), `/schueler/leistungsdaten/{id}` (PATCH/DELETE),
+  `/abschluesse/schueler/lernabschnittsdaten/{id}` (GET/PATCH, Abschluss speichern, ADR 0018),
+  `/schild3/pruefungsordnungen`. Nur als Referenz/Abgleich:
+  `/schild3/pruefungsordnungen/optionen` (Abschluss-Kürzel, `scripts/explore-pruefungsordnungen.mjs`)
+  und `/gesamtschule/schueler/{id}/prognose_leistungsdaten/abschnitt/{abschnittID}`.
+- **Relevante Kataloge** in `allinone.json`:
+  - `SchulabschlussAllgemeinbildend` — liefert die `idAbschluss`-Werte für den Abschluss-PATCH
+    (OA `0`, ESA `2001`, EESA `5001`, MSA `10000`, MSA-Q `11000`; `KATALOG_ID` in
+    `services/schildAbschluss.ts`). Ändern sich dort IDs, muss `KATALOG_ID` nachgezogen werden.
+  - `ZulaessigeKursart` (z. B. `E`, `G`, `WPI`, `EGSN` — siehe `prognoseEingabe.ts`),
+    `Fach` (Statistik-Kürzel), `Note`, `Schulform`, `Jahrgaenge`.
+
+---
+
 ## Pinia-Stores — Überblick
 
 | Store | Inhalt | Besonderheit |
 |---|---|---|
-| `authStore` | `baseUrl`, `schema`, `username`, `isConnected` | **Kein Passwort gespeichert** — nur im apiClient-Closure |
-| `prognoseStore` | `notenbilder: Map<id, NotenbildSchueler>`, `ergebnisse: Map<id, PrognoseErgebnis>` | RAM-only |
-| `schuelerStore` | `klassen[]`, `schueler[]`, `ausgewaehltId` | |
-| `schuljahresabschnittStore` | `abschnitte[]`, `ausgewaehltId` | Setzt automatisch `istAktuell` |
+| `authStore` | `baseUrl`, `schema`, `username`, `schulformKuerzel`, `schulform`, `schulformUnterstuetzt`, `isConnected` | **Kein Passwort gespeichert** — nur im apiClient-Closure. `connect()` lädt `/schule/stammdaten`; nur GE/SK/PS gelten als unterstützt (sonst Jahrgangskacheln gesperrt) |
+| `schuljahresabschnittStore` | `abschnitte[]`, `ausgewaehltId`, `ausgewaehlt` | `setFromStammdaten()` setzt `istAktuell` und wählt den aktuellen Abschnitt |
+| `schuelerStore` | `klassen[]`, `schueler[]`, `ausgewaehltId`, `laedt`, `fehler`, `abschlussLaedt` | `loadFuerAbschnitt()` über die Auswahlliste; `ladeAbschlussDaten()` holt die Lernabschnittsdaten in 10er-Batches (gespeicherter Abschluss, PO, Prognose-Flag) |
+| `faecherStore` | `faecher[]`, `faecherMap` (id → FachDaten) | Einmalig per `ensureLoaded()` |
+| `prognoseStore` | `notenbilder`, `ergebnisse` (Maps), Flags `laedt`/`schreibt` | Derzeit von keinem View genutzt |
 
 ---
 
@@ -251,13 +296,10 @@ Im Production-Build (Electron) wird direkt per HTTPS verbunden.
 
 | View/Bereich | Status |
 |---|---|
-| `SchuelerauswahlView` | Stub — zeigt Klassenfilter, kein API-Abruf |
-| `NotenbildView` | Leere Datei |
-| `PrognoseView` | Leere Datei |
-| `AuswertungenView` | Nur "folgt"-Text |
-| `EinstellungenView` | Leere Datei |
-| `svwsService.ts` | Alle Funktionen mit `// TODO: Mapping`-Kommentar |
-| `prognoseStore.laedt/schreibt` | Flags vorhanden, aber nirgends gesetzt |
+| `NotenbildView` | Platzhalter („Implementierung folgt“), Route `notenbilder` existiert |
+| `EinstellungenView` | Platzhalter („Implementierung folgt“), Route `einstellungen` existiert |
+| `prognoseStore` | Vorhanden, aber ungenutzt |
+| `svwsService.ts` Legacy | `loadKlassen`, `loadSchueler`, `loadNotenbild` (für NotenbildView vorgesehen) und `loadPrognoseLeistungsdaten` (nur Abgleich gegen den Server) ohne Aufrufer |
 
 ---
 
@@ -278,7 +320,7 @@ Im Production-Build (Electron) wird direkt per HTTPS verbunden.
 
 ```bash
 npm run dev          # Vite Dev-Server (mit CORS-Proxy für SVWS)
-npm run test         # Vitest (78 APO-SI20-Testfälle)
+npm run test         # Vitest (107 Tests, davon 78 APO-SI20-Fälle)
 npx tsc --noEmit     # TypeScript-Check ohne Build
 npm run electron:dev # Electron-App (erfordert vorherigen Build)
 npm run build        # Produktions-Build nach dist/
@@ -296,12 +338,40 @@ npm run build        # Produktions-Build nach dist/
 
 3. **WP-Normierung**: `WP1`, `WP2`, etc. werden intern zu `WPU`. Im Eingabeformular
    kann der Nutzer `WP1` eingeben — die Normierung passiert in `normKuerzel()`.
+   SVWS-Daten tragen Schulkürzel (`F6 WP1`, `E5`, `REL` …): `services/prognoseEingabe.ts`
+   ordnet sie wie PM2 zu — WP-Fach über Kursart `WPI` → `WPU`, `EGSN` über Kursart,
+   Kernfächer/NW/AL/GL über das Statistik-Kürzel. Gegen `prognose_leistungsdaten`
+   des SVWS-Servers geprüft (239 Schüler Jg 9/10, identische Prognosen).
 
 4. **ZusatzFS**: Nur `istFremdsprache=true && kuerzel≠'E'` gilt als Zusatz-FS.
    Englisch (`E`) ist KEIN ZusatzFS, auch wenn `istFremdsprache=true` gesetzt ist.
 
 5. **MSAQ FLD-NW-Schwelle**: Verwendet **MSA-Niveau-Schwellen** (G≥5), NICHT MSAQ-Schwellen
-   (G≥4). Das war ein kritischer Bug, der drei Tests zum Scheitern brachte.
+   (G≥4). Die Sperre ist ergebnisneutral: In PM2 ist sie toter Code (`FLD_NW_Fach` wird
+   nie belegt), die Fälle scheitern ohnehin an der 2NS/3NS-Prüfung.
 
 6. **MSAQ fg2DefAnz**: Zählt nur `fg2_1NSAnz` (nicht `+ fg2_2NSAnz`), weil 2NS-Fächer
    bereits in 1NS enthalten sind.
+
+7. **MSA-Ausgleich fehlende "3"**: FLD-NW gleicht nur mit E≤3 oder **G≤2** aus
+   (PM2 `CheckMSAAusgleich`), nicht mit G=3.
+
+8. **Vorprüfung** (`vorpruefung()` in `apoSI20.ts`, PM2 `AddDokuPreCheck`): Befunde landen in
+   `hinweise`, `vollstaendig` wird `false`, Speichern bleibt erlaubt.
+   - GL-Note + Einzelnoten EK/GE/WP → Warnung, EK/GE/WP werden ignoriert (PM2 bricht ab).
+   - Mehr als ein NW-Fach mit E-/G-Kurs → alle Prüfungen abgebrochen (außer ESA Jg. 10).
+   - FLD-Pflicht (`RegelwerkInput.halbjahr` = Abschnitt 1/2): Jg. 8 und Jg. 9/1. Hj. nur
+     E, M; ab Jg. 9/2. Hj. D, E, M und ein NW-Fach (CH/PH/BI). Fehlt eine → MSA/MSA-Q
+     abgebrochen. Vorher rechnet MSA auch ohne NW-Kurs. Jg. 9 ohne Halbjahr: keine FLD-Pflicht.
+     Der SVWS-Server kennt keinen Quartalsbetrieb mehr: Abschnitt = Halbjahr, pro Abschnitt
+     gibt es eine Quartals- und eine Halbjahresnote (`noteQuartal`/`note`). Die Umrechnung
+     von vier Abschnitten in PM2 (`GetPM2Halbjahr`) ist daher bewusst nicht übernommen.
+
+9. **Abschluss speichern** (ADR 0018): Zwei PATCHes — erst `/schueler/lernabschnittsdaten/{id}`
+   (Prüfungsordnung in Langform `GE/APO-SI20/5-10`, Prognose-Flag, LBNW), dann
+   `/abschluesse/schueler/lernabschnittsdaten/{id}` mit `idAbschluss` (Katalog-ID, kein Kürzel).
+   Mit Quartalsnoten gerechnet → `idAbschlussQuartalsprognose`/`textErgebniseQuartalsprognose`.
+   Der neue Endpunkt nimmt die PO bewusst nur in Kurzform (`APO-SI20`, Langform → 400); die DB
+   bleibt Schild3-kompatibel. Geplant: später atomar in einem PATCH über `/abschluesse/…`.
+   Server-Eigenheit: ungültige ID → still `null`
+   (daher Antwort des PATCH prüfen, 200 mit `Abschlussdaten`).

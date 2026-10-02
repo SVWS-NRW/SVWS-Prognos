@@ -15,7 +15,7 @@ export interface AuthConfig {
 const SVWS_SCHULFORM: Record<string, Schulform> = {
   GE: 'GESAMTSCHULE',
   SK: 'SEKUNDARSCHULE',
-  PR: 'PRIMUSSCHULE',
+  PS: 'PRIMUSSCHULE',
 }
 
 export const useAuthStore = defineStore('auth', () => {

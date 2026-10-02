@@ -64,6 +64,15 @@ Bitten Sie Ihren SVWS-Administrator, ein gültiges SSL-Zertifikat (z. B. von Let
 **Workaround (temporär, nur für Administratoren):**  
 In manchen Schulumgebungen wird das Zertifikat zunächst im Betriebssystem als vertrauenswürdig markiert. Bitte konsultieren Sie Ihre IT-Abteilung.
 
+**Web-App im Browser:**  
+Bei einem selbstsignierten Zertifikat scheitert schon die Anmeldung, ohne dass der Browser eine Zertifikatswarnung zeigt – in den Entwicklerwerkzeugen (F12) erscheint nur ein CORS- bzw. Netzwerkfehler (Chrome/Chromium: `net::ERR_CERT_AUTHORITY_INVALID`). Der Browser muss dem Zertifikat vorher vertrauen:
+
+1. Rufen Sie die Server-URL (z. B. `https://localhost:8443`) direkt im Browser auf.
+2. Erscheint eine Zertifikatswarnung, bestätigen Sie die Ausnahme („Erweitert“ → „Weiter zu …“). In Chrome/Chromium gilt das nur, bis der Browser geschlossen wird.
+3. Dauerhaft: Importieren Sie das Zertifikat im Browser als Zertifizierungsstelle (Chrome/Chromium: Einstellungen → Datenschutz und Sicherheit → Sicherheit → Zertifikate verwalten). Chrome/Chromium unter Linux und Firefox haben jeweils einen eigenen Zertifikatsspeicher.
+
+Mit einem offiziellen Zertifikat (z. B. Let's Encrypt) entfällt dieser Schritt.
+
 ---
 
 ### Die App zeigt keine Schüler an
@@ -73,6 +82,7 @@ Wenn nach dem Verbinden keine Klassen oder Schüler erscheinen:
 - Prüfen Sie, ob der richtige **Schuljahresabschnitt** ausgewählt ist
 - Stellen Sie sicher, dass Ihr SVWS-Benutzer die erforderlichen Leserechte für die entsprechenden Klassen und Jahrgänge hat
 - Kontaktieren Sie Ihren SVWS-Administrator und bitten Sie um Überprüfung der Berechtigungen
+- Fehlen nur bei **einzelnen** Schülern die Daten und liegt die Web-App im Internet, der SVWS-Server aber im Schulnetz: siehe [Web-App im Internet, SVWS-Server im Schulnetz](installation.md#web-app-im-internet-svws-server-im-schulnetz)
 
 ---
 

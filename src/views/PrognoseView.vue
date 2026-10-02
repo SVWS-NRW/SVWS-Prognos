@@ -11,7 +11,7 @@
         @click="pruefeUndNavigiere(() => router.push({ name: 'jahrgang', params: { jg: jahrgang ?? '' } }))"
       />
       <Button icon="pi pi-arrow-left" text size="small" @click="pruefeUndNavigiere(() => router.back())" />
-      <span class="toolbar-title">{{ schuelerName }}<span v-if="schuelerKlasse" class="toolbar-klasse"> · {{ schuelerKlasse }}</span></span>
+      <span class="toolbar-title">{{ schuelerName }}<span v-if="schuelerKlasse" class="toolbar-klasse"> · {{ schuelerKlasse }}</span><span class="toolbar-klasse" title="ID des Schülerdatensatzes"> · ID {{ schuelerId }}</span></span>
       <Button
         v-if="naechsterSchueler"
         icon="pi pi-arrow-right"
@@ -59,7 +59,8 @@
     <Message v-else-if="fehler" severity="error">{{ fehler }}</Message>
 
     <!-- Hauptbereich -->
-    <div v-else class="main-layout">
+    <template v-else>
+    <div class="main-layout">
 
       <!-- Fächerkarte -->
       <div class="card">
@@ -84,6 +85,7 @@
               size="small"
               show-clear
               placeholder="–"
+              :disabled="istAOSFSchueler"
               class="po-select"
             />
           </div>
@@ -94,6 +96,16 @@
           <div class="abschluss-field abschluss-field--check">
             <Checkbox v-model="istAbschlussPrognose" :binary="true" input-id="ist-prog-chk" />
             <label for="ist-prog-chk" class="abschluss-label">Ist Prognose</label>
+          </div>
+          <div v-if="istAOSFSchueler" class="abschluss-hinweis">
+            Prüfungsordnung AOSF (sonderpädagogische Förderung): Prognos überschreibt weder
+            Prüfungsordnung noch Abschluss
+          </div>
+          <div v-else-if="!abschlussWirdGespeichert" class="abschluss-hinweis">
+            Abschluss wird nur mit Prüfungsordnung APO-SI20 gespeichert
+          </div>
+          <div v-else-if="notenModus === 'quartal'" class="abschluss-hinweis">
+            Abschluss wird als Quartalsprognose gespeichert
           </div>
           <div v-if="speichernFehler" class="speichern-fehler">{{ speichernFehler }}</div>
         </div>
@@ -111,14 +123,14 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-if="lbnwNote !== null">
+              <tr>
                 <td>
                   <InputText model-value="LBNW" size="small" class="w-kuerzel" readonly />
                 </td>
                 <td>
                   <InputText model-value="Lernbereich Naturwissenschaften" size="small" class="w-bez" readonly />
                 </td>
-                <td :class="{ 'note--rot': lbnwNote >= 5 }">
+                <td :class="{ 'note--rot': lbnwNote !== null && lbnwNote >= 5 }">
                   <Select
                     :model-value="lbnwNote"
                     :options="noteOptionen"
@@ -206,10 +218,20 @@
             <div class="result-badge">{{ ergebnis.empfehlung }}</div>
             <div class="result-name">{{ abschlussName(ergebnis.empfehlung) }}</div>
             <div class="result-sub">
-              APO-SI20 · Jg. {{ jahrgang ?? '–' }} · {{ notenModus === 'quartal' ? 'Quartalsnoten' : 'Halbjahresnoten' }}
+              APO-SI20 · Jg. {{ jahrgang ?? '–' }}{{ halbjahr ? `/${halbjahr}. Hj.` : '' }} · {{ notenModus === 'quartal' ? 'Quartalsnoten' : 'Halbjahresnoten' }}
             </div>
           </div>
+          <div v-if="ergebnis.hinweise.length > 0" class="result-hinweise">
+            <Message
+              v-for="h in ergebnis.hinweise"
+              :key="h.regelId"
+              :severity="h.schwere === 'kritisch' ? 'error' : 'warn'"
+              size="small"
+            >{{ h.text }}</Message>
+          </div>
           <div class="result-protokoll">
+            <div class="plog plog--info">Berechnung wurde mit {{ notenModus === 'quartal' ? 'Quartalsnoten' : 'Halbjahresnoten' }} durchgeführt.</div>
+            <div class="plog">&nbsp;</div>
             <div
               v-for="(line, i) in ergebnis.protokoll"
               :key="i"
@@ -224,6 +246,7 @@
       </div>
 
     </div>
+    </template>
 
     <!-- Hinweisdialog: Kursartwechsel -->
     <Dialog
@@ -297,13 +320,18 @@ import { useFaecherStore } from '@/stores/faecher'
 import {
   loadSvwsLernabschnittsdaten,
   loadPruefungsordnungen,
+  loadAbschlussdaten,
   patchLernabschnittsdaten,
+  patchAbschlussdaten,
   patchLeistungsdaten,
   deleteLeistungsdaten,
   parseNoteString,
 } from '@/services/svwsService'
 import type { SvwsPruefungsordnung } from '@/services/svwsService'
-import type { SvwsLernabschnittsdaten } from '@/models/Lernabschnitt'
+import { ordneRechenKuerzelZu } from '@/services/prognoseEingabe'
+import { ABSCHLUSS_KURZ, APO_SI20_PO, abschlussZuKatalogId, abschlussZuSchild, abschlussartZuSchild, istAOSF, istApoSI20 } from '@/services/schildAbschluss'
+import type { FachDaten } from '@/models/Fach'
+import type { SvwsAbschlussdaten, SvwsLernabschnittsdaten } from '@/models/Lernabschnitt'
 import ThemeToggle from '@/components/ThemeToggle.vue'
 
 const route = useRoute()
@@ -340,6 +368,7 @@ const notenModus = ref<'halbjahr' | 'quartal'>('halbjahr')
 const selectedAbschnittId = ref<number | null>(abschnittStore.ausgewaehltId)
 
 const rawLernabschnitt = ref<SvwsLernabschnittsdaten | null>(null)
+const rawAbschlussdaten = ref<SvwsAbschlussdaten | null>(null)
 const pruefungsordnungen = ref<SvwsPruefungsordnung[]>([])
 const selectedPO = ref<string | null>('APO-SI20')
 const istAbschlussPrognose = ref(true)
@@ -351,52 +380,56 @@ const kursartWarnungNichtMehrZeigen = ref(false)
 const kursartWarnungUnterdrückt = ref(false)
 const pendingNavigate = ref<(() => void) | null>(null)
 
-const SCHULFORM_KUERZEL: Record<string, string> = {
-  GESAMTSCHULE: 'GE', SEKUNDARSCHULE: 'SK', PRIMUSSCHULE: 'PR',
-}
-
-// Mapping: Prognose-Empfehlung → SVWS-Abschluss-Code (APO-SI20-Nomenklatur)
-const EMPFEHLUNG_ZU_SVWS: Record<string, string> = {
-  OA: 'OA', ESA: 'ESA', EESA: 'HA10', MSA: 'MSA', MSA_Q: 'MSA-Q',
-}
-
-const ABSCHLUSS_LABEL: Record<string, string> = {
-  OA: 'Ohne Abschluss', ESA: 'ESA', HA: 'HA9', HA10: 'HA10',
-  FOR: 'MSA', 'FORQ-E': 'MSA/Q', MSA: 'MSA', 'MSA-Q': 'MSA/Q',
-}
-
 const berechneterAbschlussCode = computed(() =>
-  ergebnis.value ? (EMPFEHLUNG_ZU_SVWS[ergebnis.value.empfehlung] ?? null) : null
+  ergebnis.value ? abschlussZuSchild(ergebnis.value.empfehlung) : null
 )
 
-const berechneterAbschlussAnzeige = computed(() => {
-  const code = berechneterAbschlussCode.value
-  if (!code) return '–'
-  return ABSCHLUSS_LABEL[code] ? `${code} – ${ABSCHLUSS_LABEL[code]}` : code
+const berechneterAbschlussAnzeige = computed(() => berechneterAbschlussCode.value ?? '–')
+
+// Der Abschluss wird nur zusammen mit APO-SI20 gespeichert, weil nur dafür gerechnet wird
+const abschlussWirdGespeichert = computed(() => istApoSI20(selectedPO.value))
+
+// Halbjahresnoten → idAbschluss + idAbschlussart, Quartalsnoten → idAbschlussQuartalsprognose
+function abschlussFelder(empfehlung: AbschlussTyp): Partial<SvwsAbschlussdaten> {
+  const id = abschlussZuKatalogId(empfehlung)
+  const text = protokollText(empfehlung, ergebnis.value?.protokoll ?? [])
+  return notenModus.value === 'quartal'
+    ? { idAbschlussQuartalsprognose: id, textErgebniseQuartalsprognose: text }
+    : { idAbschluss: id, idAbschlussart: abschlussartZuSchild(empfehlung), textErgebnisPruefungsalgorithmus: text }
+}
+
+const abschlussGeaendert = computed(() => {
+  if (!abschlussWirdGespeichert.value || !ergebnis.value) return false
+  const ad = rawAbschlussdaten.value
+  const id = abschlussZuKatalogId(ergebnis.value.empfehlung)
+  if (notenModus.value === 'quartal') return id !== (ad?.idAbschlussQuartalsprognose ?? null)
+  return id !== (ad?.idAbschluss ?? null)
+    || abschlussartZuSchild(ergebnis.value.empfehlung) !== (ad?.idAbschlussart ?? null)
 })
 
-// Eindeutige PO-Namen aus der API (z.B. "APO-SI20" aus "GE/APO-SI20/5-10")
+// Nur APO-SI20 anbieten: Nur sie ist für Jg. 8–10 noch gültig und nur sie berechnet die Engine.
+// Andere Prüfungsordnungen der Schulform werden mit anderen Programmen berechnet.
+const apoSI20Option = computed(() => {
+  const po = pruefungsordnungen.value.find(p => istApoSI20(p.pruefungsOrdnung))
+  return { value: po?.pruefungsOrdnung ?? APO_SI20_PO, label: po?.bezeichnung ?? 'APO-SI20' }
+})
+
+// Gespeicherte AOSF-Prüfungsordnung bleibt erhalten: Ob eine Prognose bei Förderbedarf
+// sinnvoll ist, ist offen, daher wird sie nicht durch APO-SI20 ersetzt.
+const istAOSFSchueler = computed(() => istAOSF(rawLernabschnitt.value?.pruefungsOrdnung))
 const poOptionen = computed(() => {
-  const seen = new Set<string>()
-  const opts: { value: string; label: string }[] = []
-  for (const po of pruefungsordnungen.value) {
-    const parts = po.pruefungsOrdnung.split('/')
-    const poName = parts[1] ?? po.pruefungsOrdnung
-    if (!seen.has(po.pruefungsOrdnung)) {
-      seen.add(po.pruefungsOrdnung)
-      const label = po.bezeichnung ? `${poName} – ${po.bezeichnung}` : poName
-      opts.push({ value: po.pruefungsOrdnung, label })
-    }
-  }
-  if (!opts.find(o => o.value.includes('APO-SI20'))) {
-    const sfKuerzel = SCHULFORM_KUERZEL[schulform.value] ?? 'GE'
-    opts.unshift({ value: `${sfKuerzel}/APO-SI20/5-10`, label: 'APO-SI20' })
-  }
-  return opts
+  const gespeichertePO = rawLernabschnitt.value?.pruefungsOrdnung
+  if (!istAOSFSchueler.value || !gespeichertePO) return [apoSI20Option.value]
+  const po = pruefungsordnungen.value.find(p => p.pruefungsOrdnung === gespeichertePO)
+  return [{ value: gespeichertePO, label: po?.bezeichnung ?? gespeichertePO }, apoSI20Option.value]
 })
 
 
 const lbnwNote = ref<number | null>(null)
+
+const halbjahr = computed(() =>
+  abschnittStore.abschnitte.find(a => a.id === selectedAbschnittId.value)?.abschnitt ?? null
+)
 
 const notenGeaendert = computed(() => {
   if (lbnwNote.value !== (rawLernabschnitt.value?.noteLernbereichNW ?? null)) return true
@@ -423,6 +456,7 @@ const hasChanges = computed(() => {
   if (istAbschlussPrognose.value !== (la.istAbschlussPrognose ?? !istAbschlussPrognose.value)) return true
   if (faecherGeloescht.value) return true
   if (neueFaecherVorhanden.value) return true
+  if (abschlussGeaendert.value) return true
   return notenGeaendert.value
 })
 
@@ -503,6 +537,7 @@ const ergebnis = computed(() => {
   }
   return berechnePrognose({
     jahrgang: jahrgang.value,
+    halbjahr: halbjahr.value,
     schulform: schulform.value,
     faecher: eingabe,
   })
@@ -536,58 +571,46 @@ async function laden(abschnittIdParam?: number) {
     const [lernabschnitt] = await Promise.all([
       loadSvwsLernabschnittsdaten(schuelerId.value, abschnittId),
       pruefungsordnungen.value.length === 0
-        ? loadPruefungsordnungen().then(pos => { pruefungsordnungen.value = pos })
+        ? loadPruefungsordnungen(authStore.schulformKuerzel).then(pos => { pruefungsordnungen.value = pos })
         : Promise.resolve(),
     ])
     rawLernabschnitt.value = lernabschnitt
+    rawAbschlussdaten.value = await loadAbschlussdaten(lernabschnitt.id)
     lbnwNote.value = lernabschnitt.noteLernbereichNW
 
     const schueler = schuelerStore.schueler.find(s => s.id === schuelerId.value)
     jahrgang.value = schueler?.jahrgang ?? null
 
-    // Prüfungsordnung: APO-SI20 als Default; gespeicherten Wert nur übernehmen wenn
-    // er einer bekannten Option entspricht (verhindert leeres Dropdown bei alten Formaten)
-    {
-      const sfKuerzel = SCHULFORM_KUERZEL[schulform.value] ?? 'GE'
-      const apoOption = pruefungsordnungen.value.find(po =>
-        po.pruefungsOrdnung.startsWith(`${sfKuerzel}/APO-SI20/`)
-      )?.pruefungsOrdnung ?? `${sfKuerzel}/APO-SI20/5-10`
+    // Prüfungsordnung: APO-SI20, da nur diese angeboten und berechnet wird; AOSF bleibt stehen
+    selectedPO.value = istAOSF(lernabschnitt.pruefungsOrdnung)
+      ? lernabschnitt.pruefungsOrdnung
+      : apoSI20Option.value.value
 
-      const gespeichertePO = lernabschnitt.pruefungsOrdnung
-      const gespeicherteGueltig = !!gespeichertePO && (
-        gespeichertePO === apoOption ||
-        pruefungsordnungen.value.some(po => po.pruefungsOrdnung === gespeichertePO)
-      )
-      selectedPO.value = gespeicherteGueltig ? gespeichertePO : apoOption
-    }
+    // Ist Prognose: immer, außer Jg. 10 im 2. Halbjahr — dort ist der berechnete Abschluss der
+    // tatsächliche. Gilt auch, wenn ein anderer Wert gespeichert ist; manuell weiter änderbar.
+    const abschnittNr = abschnittStore.abschnitte.find(a => a.id === abschnittId)?.abschnitt
+    istAbschlussPrognose.value = !(Number(jahrgang.value) === 10 && abschnittNr === 2)
 
-    // IstAbschlussPrognose: gespeicherten Wert nehmen oder Default berechnen
-    if (lernabschnitt.istAbschlussPrognose !== null) {
-      istAbschlussPrognose.value = lernabschnitt.istAbschlussPrognose
-    } else {
-      const jgNum = Number(jahrgang.value)
-      const abschnittNr = abschnittStore.abschnitte.find(a => a.id === abschnittId)?.abschnitt
-      istAbschlussPrognose.value = jgNum < 10 || (jgNum === 10 && abschnittNr === 1)
-    }
+    const belegungen = lernabschnitt.leistungsdaten
+      .map(ld => ({ ld, fach: faecherStore.faecherMap.get(ld.fachID) }))
+      .filter((b): b is { ld: typeof b.ld; fach: FachDaten } => b.fach !== undefined)
+    const rechenKuerzel = ordneRechenKuerzelZu(belegungen.map(({ ld, fach }) => ({ fach, kursart: ld.kursart })))
 
-    rohFaecher.value = lernabschnitt.leistungsdaten
-      .map(ld => {
-        const fach = faecherStore.faecherMap.get(ld.fachID)
-        if (!fach) return null
-        const noteHj = parseNoteString(ld.note)
-        const noteQ = parseNoteString(ld.noteQuartal)
-        return {
-          kuerzel: normKuerzel(fach.kuerzel),
-          bezeichnung: fach.bezeichnung ?? '',
-          note: notenModus.value === 'quartal' ? noteQ : noteHj,
-          kursart: mapKursart(ld.kursart),
-          istFremdsprache: fach.istFremdsprache,
-          noteHalbjahr: noteHj,
-          noteQuartal: noteQ,
-          svwsId: ld.id,
-        } satisfies RohFach
-      })
-      .filter((f): f is RohFach => f !== null)
+    rohFaecher.value = belegungen.map(({ ld, fach }, i) => {
+      const noteHj = parseNoteString(ld.note)
+      const noteQ = parseNoteString(ld.noteQuartal)
+      const bezeichnung = fach.bezeichnung ?? ''
+      return {
+        kuerzel: rechenKuerzel[i],
+        bezeichnung: rechenKuerzel[i] === fach.kuerzel ? bezeichnung : `${bezeichnung} (${fach.kuerzel})`,
+        note: notenModus.value === 'quartal' ? noteQ : noteHj,
+        kursart: mapKursart(ld.kursart),
+        istFremdsprache: fach.istFremdsprache,
+        noteHalbjahr: noteHj,
+        noteQuartal: noteQ,
+        svwsId: ld.id,
+      } satisfies RohFach
+    })
 
     faecher.value = kernfaecherNachOben(rohFaecher.value.map(f => ({
       kuerzel: f.kuerzel,
@@ -651,6 +674,17 @@ async function doSpeichern() {
     }
     await patchLernabschnittsdaten(rawLernabschnitt.value.id, body)
 
+    // Erst nach der Prüfungsordnung, da der Server den Abschluss gegen sie prüft
+    if (abschlussWirdGespeichert.value && ergebnis.value) {
+      const felder = abschlussFelder(ergebnis.value.empfehlung)
+      const antwort = await patchAbschlussdaten(rawLernabschnitt.value.id, felder)
+      const idFeld = notenModus.value === 'quartal' ? 'idAbschlussQuartalsprognose' : 'idAbschluss'
+      // Eine im Schuljahr ungültige ID setzt der Server ohne Fehler auf null
+      if (antwort[idFeld] !== felder[idFeld]) {
+        throw new Error(`Der SVWS-Server hat den Abschluss ${ABSCHLUSS_KURZ[ergebnis.value.empfehlung]} nicht übernommen.`)
+      }
+    }
+
     // Gelöschte Fächer vom Server entfernen
     const vorhandeneIds = new Set(faecher.value.map(f => f.svwsId).filter((id): id is number => id !== null))
     for (const rohF of rohFaecher.value) {
@@ -704,6 +738,12 @@ function addFach() {
   faecher.value.push({ kuerzel: '', bezeichnung: '', note: null, kursart: 'Sonstige', istFremdsprache: false, svwsId: null })
 }
 
+function protokollText(empfehlung: AbschlussTyp, protokoll: string[]): string {
+  const kopf = `SVWS-Prognos · APO-SI20 · Jg. ${jahrgang.value ?? '–'}${halbjahr.value ? `/${halbjahr.value}. Hj.` : ''}`
+    + ` · ${notenModus.value === 'quartal' ? 'Quartalsnoten' : 'Halbjahresnoten'} · ${new Date().toLocaleString('de-DE')}`
+  return [kopf, `Prognose: ${ABSCHLUSS_KURZ[empfehlung]}`, '', ...protokoll].join('\n')
+}
+
 function protokollClass(line: string): string {
   if (line.startsWith('✓')) return 'plog plog--ok'
   if (line.startsWith('✗')) return 'plog plog--fail'
@@ -735,10 +775,6 @@ function kernfaecherNachOben<T extends { kuerzel: string }>(arr: T[]): T[] {
     if (ib !== -1) return 1
     return 0
   })
-}
-
-function normKuerzel(kuerzel: string): string {
-  return /^WP\d/.test(kuerzel) ? 'WPU' : kuerzel
 }
 
 function mapKursart(k: string | null): 'E' | 'G' | 'Sonstige' {
@@ -903,6 +939,14 @@ function mapKursart(k: string | null): 'E' | 'G' | 'Sonstige' {
 .result-name   { font-size: 0.7rem; font-weight: 600; line-height: 1.3; }
 .result-sub    { font-size: 0.62rem; opacity: 0.65; }
 
+.result-hinweise {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid var(--p-content-border-color);
+}
+
 .result-protokoll {
   flex: 1;
   min-height: 0;
@@ -920,6 +964,7 @@ function mapKursart(k: string | null): 'E' | 'G' | 'Sonstige' {
 .plog--fail   { color: #b91c1c; }
 .plog--warn   { color: #b45309; }
 .plog--result { font-weight: 700; font-size: 0.72rem; color: var(--p-primary-color); margin-top: 0.2rem; }
+.plog--info   { color: #60a5fa; margin-bottom: 0.3rem; }
 
 .result-icon-leer { font-size: 1.4rem; opacity: 0.3; }
 .result-leer-text { font-size: 0.68rem; line-height: 1.3; }
@@ -943,6 +988,7 @@ function mapKursart(k: string | null): 'E' | 'G' | 'Sonstige' {
 .po-select      { width: 14rem; }
 .abschluss-select { width: 8rem; }
 .speichern-fehler { font-size: 0.72rem; color: #b91c1c; margin-left: auto; }
+.abschluss-hinweis { font-size: 0.72rem; color: #b45309; }
 
 .kursart-warn-footer {
   display: flex;

@@ -15,9 +15,22 @@ export interface SvwsLernabschnittsdaten {
   noteLernbereichNW: number | null
   noteLernbereichGSbzwAL: number | null
   abschluss: string | null
+  abschlussart: number | null
   istAbschlussPrognose: boolean | null
   pruefungsOrdnung: string | null
   leistungsdaten: SvwsLeistungsdaten[]
+}
+
+// GET/PATCH /abschluesse/schueler/lernabschnittsdaten/{id}
+export interface SvwsAbschlussdaten {
+  idLernabschnitt: number
+  pruefungsordnung: string | null
+  idAbschluss: number | null
+  istAbschlussPrognose: boolean | null
+  idAbschlussart: number | null
+  textErgebnisPruefungsalgorithmus: string | null
+  idAbschlussQuartalsprognose: number | null
+  textErgebniseQuartalsprognose: string | null
 }
 
 export interface Leistung {

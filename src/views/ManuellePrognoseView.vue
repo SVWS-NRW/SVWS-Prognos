@@ -15,6 +15,14 @@
         style="width: 9rem"
       />
       <Select
+        v-model="halbjahr"
+        :options="halbjahrOptionen"
+        option-label="label"
+        option-value="value"
+        size="small"
+        style="width: 9rem"
+      />
+      <Select
         v-model="schulform"
         :options="schulformOptionen"
         option-label="label"
@@ -120,7 +128,15 @@
           <div class="result-header">
             <div class="result-badge">{{ ergebnis.empfehlung }}</div>
             <div class="result-name">{{ abschlussName(ergebnis.empfehlung) }}</div>
-            <div class="result-sub">APO-SI20 · Jg. {{ jahrgang ?? '–' }}</div>
+            <div class="result-sub">APO-SI20 · Jg. {{ jahrgang ?? '–' }}{{ halbjahr ? `/${halbjahr}. Hj.` : '' }}</div>
+          </div>
+          <div v-if="ergebnis.hinweise.length > 0" class="result-hinweise">
+            <Message
+              v-for="h in ergebnis.hinweise"
+              :key="h.regelId"
+              :severity="h.schwere === 'kritisch' ? 'error' : 'warn'"
+              size="small"
+            >{{ h.text }}</Message>
           </div>
           <div class="result-protokoll">
             <div
@@ -147,6 +163,7 @@ import Button from 'primevue/button'
 import Select from 'primevue/select'
 import InputText from 'primevue/inputtext'
 import Checkbox from 'primevue/checkbox'
+import Message from 'primevue/message'
 import { berechnePrognose } from '@/rules'
 import type { AbschlussTyp } from '@/models/PrognoseErgebnis'
 import type { Schulform } from '@/rules/types'
@@ -191,6 +208,7 @@ function lernbereicheNachOben(arr: FormFach[]): FormFach[] {
 }
 
 const jahrgang = ref<string | null>('10')
+const halbjahr = ref<1 | 2 | null>(2)
 const schulform = ref<Schulform>('GESAMTSCHULE')
 const faecher = ref<FormFach[]>(STANDARD_FAECHER.map(f => ({ ...f })))
 
@@ -199,6 +217,12 @@ const jahrgangOptionen = [
   { label: 'Jahrgang 9',  value: '9'  },
   { label: 'Jahrgang 10', value: '10' },
   { label: 'Unbekannt',   value: null },
+]
+
+const halbjahrOptionen = [
+  { label: '1. Halbjahr', value: 1 },
+  { label: '2. Halbjahr', value: 2 },
+  { label: 'Halbjahr ?',  value: null },
 ]
 
 const schulformOptionen = [
@@ -224,6 +248,7 @@ const ergebnis = computed(() => {
   if (valid.length === 0) return null
   return berechnePrognose({
     jahrgang: jahrgang.value,
+    halbjahr: halbjahr.value,
     schulform: schulform.value,
     faecher: valid.map(f => ({
       kuerzel: f.kuerzel,
@@ -261,6 +286,7 @@ function handleImport(event: Event) {
           .filter(f => f.kuerzel !== 'LBAL'),
       )
       if (src.jahrgang !== undefined) jahrgang.value = src.jahrgang
+      if (src.abschnitt !== undefined) halbjahr.value = src.abschnitt === 1 || src.abschnitt === 2 ? src.abschnitt : null
     } catch { /* ungültige Datei */ }
     input.value = ''
   }
@@ -276,7 +302,7 @@ function exportJson() {
   const testfall = {
     input: {
       schuljahr: null,
-      abschnitt: null,
+      abschnitt: halbjahr.value,
       jahrgang: jahrgang.value,
       'apo-s1': 'APO-SI20',
       faecher: valid.map(f => {
@@ -492,6 +518,14 @@ function abschlussName(a: AbschlussTyp): string {
 }
 
 /* Protokoll */
+.result-hinweise {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid var(--p-content-border-color);
+}
+
 .result-protokoll {
   flex: 1;
   min-height: 0;
