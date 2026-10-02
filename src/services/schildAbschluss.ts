@@ -27,10 +27,16 @@ export const ABSCHLUSS_KURZ: Record<AbschlussTyp, string> = {
   OA: 'OA', ESA: 'ESA', EESA: 'EESA', MSA: 'MSA', MSA_Q: 'MSA-Q',
 }
 
-// Vorübergehend aus: Der SVWS-Server prüft 'abschluss' beim PATCH gegen den ASD-Katalog
-// SchulabschlussAllgemeinbildend und lehnt Schild-Kürzel wie GE/APO-SI20/ESA mit 409 ab.
-// Wieder einschalten, sobald der Server die Kürzel aus Prueford_Optionen akzeptiert.
-export const ABSCHLUSS_SPEICHERN = false
+// IDs aus dem ASD-Katalog SchulabschlussAllgemeinbildend (data/openAPI/allinone.json), gültig ab
+// Schuljahr 2022. Ältere Einträge (HA9 = 2000, HA10 = 5000) entfallen: Jg. 8 nach APO-SI20 gibt es
+// erst ab 2023/24. Der Server setzt eine im Schuljahr ungültige ID beim PATCH stillschweigend auf null.
+const KATALOG_ID: Record<AbschlussTyp, number> = {
+  OA: 0,
+  ESA: 2001,
+  EESA: 5001,
+  MSA: 10000,
+  MSA_Q: 11000,
+}
 
 export function istApoSI20(pruefungsOrdnung: string | null | undefined): boolean {
   return !!pruefungsOrdnung && pruefungsOrdnung.includes('/APO-SI20/')
@@ -41,14 +47,21 @@ export function istAOSF(pruefungsOrdnung: string | null | undefined): boolean {
   return !!pruefungsOrdnung && pruefungsOrdnung.includes('/AOSF')
 }
 
-// Wert für das Feld 'abschluss' der Lernabschnittsdaten (PM2: PMAbschlusstoSchILDAbschluss)
+// Wert, den der Server aus idAbschluss in das Feld 'abschluss' der Lernabschnittsdaten schreibt
+// (PM2: PMAbschlusstoSchILDAbschluss)
 export function abschlussZuSchild(abschluss: AbschlussTyp): string {
   return APO_SI20_PRAEFIX + SCHILD_KUERZEL[abschluss]
 }
 
-// Wert für das Feld 'abschlussart': 1 = mit Abschluss, 0 = ohne Abschluss
-export function abschlussartZuSchild(abschluss: AbschlussTyp): 0 | 1 {
-  return abschluss === 'OA' ? 0 : 1
+// Wert für 'idAbschluss' bzw. 'idAbschlussQuartalsprognose' (PATCH /abschluesse/schueler/lernabschnittsdaten)
+export function abschlussZuKatalogId(abschluss: AbschlussTyp): number {
+  return KATALOG_ID[abschluss]
+}
+
+// Wert für 'idAbschlussart': 1 = Abschluss erreicht, 2 = ohne Abschluss
+// (0 = Jahrgang ohne Abschluss und 3 = ohne Abschluss mit Nachprüfung vergibt Prognos nicht)
+export function abschlussartZuSchild(abschluss: AbschlussTyp): 1 | 2 {
+  return abschluss === 'OA' ? 2 : 1
 }
 
 export function schildZuAbschluss(schildAbschluss: string | null | undefined): AbschlussTyp | null {

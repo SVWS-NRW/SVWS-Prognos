@@ -13,6 +13,154 @@
     "basicAuth" : [ ]
   } ],
   "paths" : {
+    "/db/{schema}/abschluesse/schueler/{id}/abschnitt/{abschnitt}" : {
+      "get" : {
+        "tags" : [ "Server" ],
+        "summary" : "Liefert zu der ID des Schülers und des Schuljahresabschnittes die zugehörigen Informationen zum erreichten Schulabschluss.",
+        "description" : "Liest die Informationen zum erreichten Schulabschluss des Schülers zu der angegebenen ID und dem angegeben Schuljahresabschnittaus der Datenbank und liefert diese zurück. Dabei wird geprüft, ob der SVWS-Benutzer die notwendige Berechtigung zum Ansehen von Schülerdaten besitzt.",
+        "operationId" : "getSchuelerAbschlussinformationen",
+        "parameters" : [ {
+          "name" : "schema",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "nullable" : true
+          }
+        }, {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }, {
+          "name" : "abschnitt",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Die Informationen zum erreichten Schulabschluss des Schülers in dem Schuljahresabschnitt",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Abschlussdaten"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Der SVWS-Benutzer hat keine Rechte, um die Schülerdaten anzusehen."
+          },
+          "404" : {
+            "description" : "Kein Schüler-Eintrag mit der angegebenen ID bzw. kein Lernabschnitt in dem angegeben Schujahresabschnitt gefunden"
+          }
+        }
+      }
+    },
+    "/db/{schema}/abschluesse/schueler/lernabschnittsdaten/{abschnitt}" : {
+      "get" : {
+        "tags" : [ "Server" ],
+        "summary" : "Liefert zu der ID des Schülerlernabschnittes die zugehörigen Informationen zum erreichten Schulabschluss.",
+        "description" : "Liest die Informationen zum erreichten Schulabschluss des Schülers zu der angegebenen ID aus der Datenbank und liefert diese zurück. Dabei wird geprüft, ob der SVWS-Benutzer die notwendige Berechtigung zum Ansehen von Schülerdaten besitzt.",
+        "operationId" : "getSchuelerAbschlussinformationenByLernabschnittID",
+        "parameters" : [ {
+          "name" : "schema",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "nullable" : true
+          }
+        }, {
+          "name" : "abschnitt",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Die Informationen zum erreichten Schulabschluss in dem Lernabschnitt des Schülers",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Abschlussdaten"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Der SVWS-Benutzer hat keine Rechte, um die Schülerdaten anzusehen."
+          },
+          "404" : {
+            "description" : "Kein Eintrag mit Schüler-Lernabschnittsdaten mit der angegebenen ID gefunden"
+          }
+        }
+      },
+      "patch" : {
+        "tags" : [ "Server" ],
+        "summary" : "Passt die Informationen zum Schulabschluss in dem Lernabschnitt mit der angegebenen ID an.",
+        "description" : "Passt die Informationen zum Schulabschluss in dem Lernabschnitt mit der angegebenen ID an. Dabei wird geprüft, ob der SVWS-Benutzer die notwendige Berechtigung zum Ändern der Abschlussinformationen besitzt.",
+        "operationId" : "patchSchuelerAbschlussinformationen",
+        "parameters" : [ {
+          "name" : "schema",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "nullable" : true
+          }
+        }, {
+          "name" : "abschnitt",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "requestBody" : {
+          "description" : "Der Patch für die Schülerlernabschnittsdaten",
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/Abschlussdaten"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "204" : {
+            "description" : "Der Patch wurde erfolgreich integriert."
+          },
+          "400" : {
+            "description" : "Der Patch ist fehlerhaft aufgebaut."
+          },
+          "403" : {
+            "description" : "Der SVWS-Benutzer hat keine Rechte, um die Daten zu ändern."
+          },
+          "404" : {
+            "description" : "Kein Eintrag mit der angegebenen ID gefunden"
+          },
+          "409" : {
+            "description" : "Der Patch ist fehlerhaft, da zumindest eine Rahmenbedingung für einen Wert nicht erfüllt wurde (z.B. eine negative ID)"
+          },
+          "500" : {
+            "description" : "Unspezifizierter Fehler (z.B. beim Datenbankzugriff)"
+          }
+        }
+      }
+    },
     "/db/{schema}/schule/abteilungen/{idSchuljahresabschnitt}" : {
       "get" : {
         "tags" : [ "Server" ],
@@ -24575,59 +24723,6 @@
         }
       }
     },
-    "/db/{schema}/schueler/delete/multiple" : {
-      "delete" : {
-        "tags" : [ "Server" ],
-        "summary" : "Entfernt mehrere Schüler durch setzen eines Löschvermerks.",
-        "description" : "Entfernt mehrere Schüler durch setzen eines Löschvermerks. Dabei wird geprüft, ob alle Vorbedingungen zum Entfernender Schüler erfüllt sind und der SVWS-Benutzer die notwendige Berechtigung hat.",
-        "operationId" : "deleteSchueler",
-        "parameters" : [ {
-          "name" : "schema",
-          "in" : "path",
-          "required" : true,
-          "schema" : {
-            "type" : "string",
-            "nullable" : true
-          }
-        } ],
-        "requestBody" : {
-          "description" : "Die IDs der zu löschenden Schüler",
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "type" : "array",
-                "items" : {
-                  "type" : "integer",
-                  "format" : "int64"
-                }
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "description" : "Die Lösch-Operationen wurden ausgeführt.",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "type" : "array",
-                  "items" : {
-                    "$ref" : "#/components/schemas/Einfache-Operation-Antwort"
-                  }
-                }
-              }
-            }
-          },
-          "403" : {
-            "description" : "Der SVWS-Benutzer hat keine Rechte, um Schüler zu entfernen."
-          },
-          "500" : {
-            "description" : "Unspezifizierter Fehler (z.B. beim Datenbankzugriff)"
-          }
-        }
-      }
-    },
     "/db/{schema}/schueler/schueler-betriebe/delete/multiple" : {
       "delete" : {
         "tags" : [ "Server" ],
@@ -27241,6 +27336,59 @@
           },
           "409" : {
             "description" : "Der Patch ist fehlerhaft, da zumindest eine Rahmenbedingung für einen Wert nicht erfüllt wurde (z.B. eine negative ID)"
+          },
+          "500" : {
+            "description" : "Unspezifizierter Fehler (z.B. beim Datenbankzugriff)"
+          }
+        }
+      }
+    },
+    "/db/{schema}/schueler/softdelete/multiple" : {
+      "delete" : {
+        "tags" : [ "Server" ],
+        "summary" : "Setzt den Löschvermerk bei mehreren Schülern.",
+        "description" : "Setzt den Löschvermerk bei mehreren Schülern, insofern der SVWS-Benutzer die notwendige Berechtigung hat.",
+        "operationId" : "softDeleteSchuelerStammdatenMultiple",
+        "parameters" : [ {
+          "name" : "schema",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "nullable" : true
+          }
+        } ],
+        "requestBody" : {
+          "description" : "Die IDs der zu löschenden Schüler",
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "array",
+                "items" : {
+                  "type" : "integer",
+                  "format" : "int64"
+                }
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Die Lösch-Operationen wurden ausgeführt.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/Einfache-Operation-Antwort"
+                  }
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "Der SVWS-Benutzer hat keine Rechte, um Schüler zu entfernen."
           },
           "500" : {
             "description" : "Unspezifizierter Fehler (z.B. beim Datenbankzugriff)"
@@ -43783,6 +43931,130 @@
   },
   "components" : {
     "schemas" : {
+      "Abschlussdaten" : {
+        "type" : "object",
+        "properties" : {
+          "idLernabschnitt" : {
+            "type" : "integer",
+            "description" : "die ID des Lernabschnitts in der Datenbank",
+            "format" : "int64",
+            "example" : 126784
+          },
+          "pruefungsordnung" : {
+            "type" : "string",
+            "description" : "die Prüfungsordnung",
+            "nullable" : true,
+            "example" : "APO-SI20"
+          },
+          "idAbschluss" : {
+            "type" : "integer",
+            "description" : "die ID des erreichten allgemeinbildende Abschlusses",
+            "format" : "int64",
+            "nullable" : true
+          },
+          "idAbschlussBerufsbildend" : {
+            "type" : "integer",
+            "description" : "die ID des erreichten berufsbezogenen Abschlusses am Berufskolleg",
+            "format" : "int64",
+            "nullable" : true
+          },
+          "istAbschlussPrognose" : {
+            "type" : "boolean",
+            "description" : "gibt an, ob es sich bei dem Abschluss um eine Prognose handelt oder nicht",
+            "example" : false
+          },
+          "idAbschlussart" : {
+            "type" : "integer",
+            "description" : "die Art des Abschlusses für den Lernabschnitt (0 = Jahrgang ohne Abschluss, 1 = Abschluss erreicht, 2 = ohne Abschluss, 3 = ohne Abschluss mit Nachprüfung)",
+            "format" : "int64",
+            "nullable" : true
+          },
+          "textErgebnisPruefungsalgorithmus" : {
+            "type" : "string",
+            "description" : "die textuelle Ausgabe des Prüfungsalgorithmus für die Versetzungs-/Abschlussberechnung",
+            "nullable" : true,
+            "example" : "null"
+          },
+          "idAbschlussQuartalsprognose" : {
+            "type" : "integer",
+            "description" : "die ID des bei der auf Quartalsnoten basierenden Prognose erreichten allgemeinbildende Abschlusses",
+            "format" : "int64",
+            "nullable" : true
+          },
+          "textErgebniseQuartalsprognose" : {
+            "type" : "string",
+            "description" : "die textuelle Ausgabe des Prüfungsalgorithmus bei der auf Quartalsnoten basierenden Prognose für die Abschlussberechnung",
+            "nullable" : true,
+            "example" : "null"
+          }
+        },
+        "description" : "Die Informationen zu dem Abschluss in einem Lernabschnitt eines Schülers.",
+        "nullable" : true
+      },
+      "AbschlussPatchRequest" : {
+        "required" : [ "pruefungsordnung" ],
+        "type" : "object",
+        "properties" : {
+          "pruefungsordnung" : {
+            "$ref" : "#/components/schemas/JsonNullableString"
+          },
+          "idAbschluss" : {
+            "$ref" : "#/components/schemas/JsonNullableLong"
+          },
+          "idAbschlussBerufsbildend" : {
+            "$ref" : "#/components/schemas/JsonNullableLong"
+          },
+          "istAbschlussPrognose" : {
+            "$ref" : "#/components/schemas/JsonNullableBoolean"
+          },
+          "idAbschlussart" : {
+            "$ref" : "#/components/schemas/JsonNullableLong"
+          },
+          "textErgebnisPruefungsalgorithmus" : {
+            "$ref" : "#/components/schemas/JsonNullableString"
+          },
+          "idAbschlussQuartalsprognose" : {
+            "$ref" : "#/components/schemas/JsonNullableLong"
+          },
+          "textErgebniseQuartalsprognose" : {
+            "$ref" : "#/components/schemas/JsonNullableString"
+          }
+        },
+        "description" : "Die Zuordnung eines Unterrichtsfachs zu einer Lehrkraft."
+      },
+      "JsonNullableBoolean" : {
+        "type" : "object",
+        "properties" : {
+          "undefined" : {
+            "type" : "boolean"
+          },
+          "present" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "JsonNullableLong" : {
+        "type" : "object",
+        "properties" : {
+          "undefined" : {
+            "type" : "boolean"
+          },
+          "present" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "JsonNullableString" : {
+        "type" : "object",
+        "properties" : {
+          "undefined" : {
+            "type" : "boolean"
+          },
+          "present" : {
+            "type" : "boolean"
+          }
+        }
+      },
       "Abteilung" : {
         "required" : [ "bezeichnung", "klassenzuordnungen" ],
         "type" : "object",
@@ -45016,17 +45288,6 @@
           },
           "textSonstiges" : {
             "$ref" : "#/components/schemas/JsonNullableString"
-          }
-        }
-      },
-      "JsonNullableString" : {
-        "type" : "object",
-        "properties" : {
-          "undefined" : {
-            "type" : "boolean"
-          },
-          "present" : {
-            "type" : "boolean"
           }
         }
       },
@@ -49145,17 +49406,6 @@
         },
         "description" : "Spezifiziert die Struktur von JSON-Daten zu den Zentralen Prüfungen der Klasse 10 für das Externe-Noten-Modul ENM."
       },
-      "JsonNullableBoolean" : {
-        "type" : "object",
-        "properties" : {
-          "undefined" : {
-            "type" : "boolean"
-          },
-          "present" : {
-            "type" : "boolean"
-          }
-        }
-      },
       "JsonNullableInteger" : {
         "type" : "object",
         "properties" : {
@@ -51279,6 +51529,9 @@
       "InputPart" : {
         "type" : "object",
         "properties" : {
+          "mediaType" : {
+            "$ref" : "#/components/schemas/MediaType"
+          },
           "bodyAsString" : {
             "type" : "string",
             "nullable" : true
@@ -51286,8 +51539,13 @@
           "contentTypeFromMessage" : {
             "type" : "boolean"
           },
-          "mediaType" : {
-            "$ref" : "#/components/schemas/MediaType"
+          "fileName" : {
+            "type" : "string",
+            "nullable" : true
+          },
+          "body" : {
+            "type" : "object",
+            "nullable" : true
           },
           "headers" : {
             "type" : "object",
@@ -51304,14 +51562,6 @@
                 "nullable" : true
               }
             },
-            "nullable" : true
-          },
-          "fileName" : {
-            "type" : "string",
-            "nullable" : true
-          },
-          "body" : {
-            "type" : "object",
             "nullable" : true
           }
         }
@@ -52523,17 +52773,6 @@
           }
         },
         "description" : "die Informationen zum Erstellen eines GOSt-Klausurraums."
-      },
-      "JsonNullableLong" : {
-        "type" : "object",
-        "properties" : {
-          "undefined" : {
-            "type" : "boolean"
-          },
-          "present" : {
-            "type" : "boolean"
-          }
-        }
       },
       "GostKlausurenSchuelerklausurCreateRequest" : {
         "required" : [ "idKursklausur", "idSchueler" ],
@@ -55778,6 +56017,12 @@
             "type" : "string",
             "description" : "Das Kürzel des Lehrers.",
             "example" : "MUS"
+          },
+          "kuerzelStatistik" : {
+            "type" : "string",
+            "description" : "Das Statistik-Kürzel des Lehrers.",
+            "nullable" : true,
+            "example" : "ALBE"
           },
           "personalTyp" : {
             "type" : "string",
@@ -59103,6 +59348,11 @@
             "description" : "Der Beruf des Schülers (nur bei Schulform BK/SB/WB)",
             "nullable" : true,
             "example" : "Tischler"
+          },
+          "hatLoeschvermerk" : {
+            "type" : "boolean",
+            "description" : "Gibt an, ob der Löschvermerk des Schülers gesetzt ist oder nicht.",
+            "example" : true
           }
         },
         "description" : "Die Stammdaten eines Schüler-Eintrags.",
@@ -60891,6 +61141,9 @@
           },
           "beruf" : {
             "$ref" : "#/components/schemas/JsonNullableString"
+          },
+          "hatLoeschvermerk" : {
+            "$ref" : "#/components/schemas/JsonNullableBoolean"
           }
         }
       },
@@ -61038,6 +61291,9 @@
           },
           "beruf" : {
             "$ref" : "#/components/schemas/JsonNullableString"
+          },
+          "hatLoeschvermerk" : {
+            "$ref" : "#/components/schemas/JsonNullableBoolean"
           },
           "id" : {
             "type" : "integer",
@@ -64237,6 +64493,12 @@
             "type" : "string",
             "description" : "Das Kürzel des Lehrers.",
             "example" : "MUS"
+          },
+          "kuerzelStatistik" : {
+            "type" : "string",
+            "description" : "Das Statistik-Kürzel des Lehrers.",
+            "nullable" : true,
+            "example" : "ALBE"
           },
           "vorname" : {
             "type" : "string",

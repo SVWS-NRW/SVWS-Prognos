@@ -101,11 +101,11 @@
             Prüfungsordnung AOSF (sonderpädagogische Förderung): Prognos überschreibt weder
             Prüfungsordnung noch Abschluss
           </div>
-          <div v-else-if="!ABSCHLUSS_SPEICHERN" class="abschluss-hinweis">
-            Abschluss wird vorerst nicht gespeichert (Korrektur im SVWS-Server ausstehend)
-          </div>
           <div v-else-if="!abschlussWirdGespeichert" class="abschluss-hinweis">
             Abschluss wird nur mit Prüfungsordnung APO-SI20 gespeichert
+          </div>
+          <div v-else-if="notenModus === 'quartal'" class="abschluss-hinweis">
+            Abschluss wird als Quartalsprognose gespeichert
           </div>
           <div v-if="speichernFehler" class="speichern-fehler">{{ speichernFehler }}</div>
         </div>
@@ -320,16 +320,18 @@ import { useFaecherStore } from '@/stores/faecher'
 import {
   loadSvwsLernabschnittsdaten,
   loadPruefungsordnungen,
+  loadAbschlussdaten,
   patchLernabschnittsdaten,
+  patchAbschlussdaten,
   patchLeistungsdaten,
   deleteLeistungsdaten,
   parseNoteString,
 } from '@/services/svwsService'
 import type { SvwsPruefungsordnung } from '@/services/svwsService'
 import { ordneRechenKuerzelZu } from '@/services/prognoseEingabe'
-import { ABSCHLUSS_KURZ, ABSCHLUSS_SPEICHERN, APO_SI20_PO, abschlussZuSchild, abschlussartZuSchild, istAOSF, istApoSI20 } from '@/services/schildAbschluss'
+import { ABSCHLUSS_KURZ, APO_SI20_PO, abschlussZuKatalogId, abschlussZuSchild, abschlussartZuSchild, istAOSF, istApoSI20 } from '@/services/schildAbschluss'
 import type { FachDaten } from '@/models/Fach'
-import type { SvwsLernabschnittsdaten } from '@/models/Lernabschnitt'
+import type { SvwsAbschlussdaten, SvwsLernabschnittsdaten } from '@/models/Lernabschnitt'
 import ThemeToggle from '@/components/ThemeToggle.vue'
 
 const route = useRoute()
@@ -366,6 +368,7 @@ const notenModus = ref<'halbjahr' | 'quartal'>('halbjahr')
 const selectedAbschnittId = ref<number | null>(abschnittStore.ausgewaehltId)
 
 const rawLernabschnitt = ref<SvwsLernabschnittsdaten | null>(null)
+const rawAbschlussdaten = ref<SvwsAbschlussdaten | null>(null)
 const pruefungsordnungen = ref<SvwsPruefungsordnung[]>([])
 const selectedPO = ref<string | null>('APO-SI20')
 const istAbschlussPrognose = ref(true)
@@ -386,12 +389,22 @@ const berechneterAbschlussAnzeige = computed(() => berechneterAbschlussCode.valu
 // Der Abschluss wird nur zusammen mit APO-SI20 gespeichert, weil nur dafür gerechnet wird
 const abschlussWirdGespeichert = computed(() => istApoSI20(selectedPO.value))
 
+// Halbjahresnoten → idAbschluss + idAbschlussart, Quartalsnoten → idAbschlussQuartalsprognose
+function abschlussFelder(empfehlung: AbschlussTyp): Partial<SvwsAbschlussdaten> {
+  const id = abschlussZuKatalogId(empfehlung)
+  const text = protokollText(empfehlung, ergebnis.value?.protokoll ?? [])
+  return notenModus.value === 'quartal'
+    ? { idAbschlussQuartalsprognose: id, textErgebniseQuartalsprognose: text }
+    : { idAbschluss: id, idAbschlussart: abschlussartZuSchild(empfehlung), textErgebnisPruefungsalgorithmus: text }
+}
+
 const abschlussGeaendert = computed(() => {
   if (!abschlussWirdGespeichert.value || !ergebnis.value) return false
-  const la = rawLernabschnitt.value
-  return ABSCHLUSS_SPEICHERN
-    ? berechneterAbschlussCode.value !== (la?.abschluss ?? null)
-    : abschlussartZuSchild(ergebnis.value.empfehlung) !== (la?.abschlussart ?? null)
+  const ad = rawAbschlussdaten.value
+  const id = abschlussZuKatalogId(ergebnis.value.empfehlung)
+  if (notenModus.value === 'quartal') return id !== (ad?.idAbschlussQuartalsprognose ?? null)
+  return id !== (ad?.idAbschluss ?? null)
+    || abschlussartZuSchild(ergebnis.value.empfehlung) !== (ad?.idAbschlussart ?? null)
 })
 
 // Nur APO-SI20 anbieten: Nur sie ist für Jg. 8–10 noch gültig und nur sie berechnet die Engine.
@@ -562,6 +575,7 @@ async function laden(abschnittIdParam?: number) {
         : Promise.resolve(),
     ])
     rawLernabschnitt.value = lernabschnitt
+    rawAbschlussdaten.value = await loadAbschlussdaten(lernabschnitt.id)
     lbnwNote.value = lernabschnitt.noteLernbereichNW
 
     const schueler = schuelerStore.schueler.find(s => s.id === schuelerId.value)
@@ -659,15 +673,20 @@ async function doSpeichern() {
       istAbschlussPrognose: istAbschlussPrognose.value,
     }
     if (selectedPO.value) body.pruefungsOrdnung = selectedPO.value
-    if (abschlussWirdGespeichert.value && ergebnis.value) {
-      if (ABSCHLUSS_SPEICHERN) body.abschluss = abschlussZuSchild(ergebnis.value.empfehlung)
-      body.abschlussart = abschlussartZuSchild(ergebnis.value.empfehlung)
-      body.textErgebnisPruefungsalgorithmus = protokollText(ergebnis.value.empfehlung, ergebnis.value.protokoll)
-    }
     if (lbnwNote.value !== rawLernabschnitt.value.noteLernbereichNW) {
       body.noteLernbereichNW = lbnwNote.value
     }
     await patchLernabschnittsdaten(rawLernabschnitt.value.id, body)
+
+    // Erst nach der Prüfungsordnung, da der Server den Abschluss gegen sie prüft
+    if (abschlussWirdGespeichert.value && ergebnis.value) {
+      const felder = abschlussFelder(ergebnis.value.empfehlung)
+      const antwort = await patchAbschlussdaten(rawLernabschnitt.value.id, felder)
+      const idFeld = notenModus.value === 'quartal' ? 'idAbschlussQuartalsprognose' : 'idAbschluss'
+      if (antwort && antwort[idFeld] !== felder[idFeld]) {
+        throw new Error(`Der SVWS-Server hat den Abschluss ${ABSCHLUSS_KURZ[ergebnis.value.empfehlung]} nicht übernommen.`)
+      }
+    }
 
     // Gelöschte Fächer vom Server entfernen
     const vorhandeneIds = new Set(faecher.value.map(f => f.svwsId).filter((id): id is number => id !== null))

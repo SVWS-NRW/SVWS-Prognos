@@ -74,7 +74,7 @@ src/
 │   ├── apiClient.ts         # Axios-Client (Basic Auth, Electron-/Browser-Proxy)
 │   ├── svwsService.ts       # SVWS-REST-Aufrufe inkl. Mapping (lesen + PATCH/DELETE)
 │   ├── prognoseEingabe.ts   # Schul-Fachkürzel → Rechenkürzel der Engine (+ Test)
-│   ├── schildAbschluss.ts   # AbschlussTyp ↔ Schild-Kürzel GE/APO-SI20/… (+ Test)
+│   ├── schildAbschluss.ts   # AbschlussTyp → Katalog-ID / Schild-Kürzel GE/APO-SI20/… (+ Test)
 │   └── errorService.ts      # toAppError(), useErrorService()
 ├── stores/
 │   ├── auth.ts              # Verbindung, Schulform (GE/SK/PS), schulformUnterstuetzt
@@ -177,7 +177,7 @@ interface EingabeFach {
 ### Tests
 
 ```bash
-npx vitest run   # 3 Testdateien, 106 Tests grün (davon 78 APO-SI20-Fälle)
+npx vitest run   # 3 Testdateien, 107 Tests grün (davon 78 APO-SI20-Fälle)
 ```
 
 `apoSI20.test.ts` liest automatisch alle `.json`/`.JSON`-Dateien aus `test-json/`
@@ -267,14 +267,14 @@ Nach einem Update prüfen, ob sich etwas für Prognos geändert hat:
   `/schule/stammdaten`, `/faecher`, `/schueler/abschnitt/{abschnitt}/auswahlliste`,
   `/schueler/lernabschnittsdaten/{idSchueler}/{idSchuljahresabschnitt}` (GET),
   `/schueler/lernabschnittsdaten/{id}` (PATCH), `/schueler/leistungsdaten/{id}` (PATCH/DELETE),
+  `/abschluesse/schueler/lernabschnittsdaten/{id}` (GET/PATCH, Abschluss speichern, ADR 0018),
   `/schild3/pruefungsordnungen`. Nur als Referenz/Abgleich:
   `/schild3/pruefungsordnungen/optionen` (Abschluss-Kürzel, `scripts/explore-pruefungsordnungen.mjs`)
   und `/gesamtschule/schueler/{id}/prognose_leistungsdaten/abschnitt/{abschnittID}`.
 - **Relevante Kataloge** in `allinone.json`:
-  - `SchulabschlussAllgemeinbildend` — gegen diesen Katalog validiert der Server das Feld
-    `abschluss` beim PATCH. Kürzel: `OA`, `ESA` (bezeichner `HA9`), `EESA` (`HA10`), `MSA`,
-    `MSA_Q` … — **nicht** die Schild-Kürzel `GE/APO-SI20/…`. Deshalb steht
-    `ABSCHLUSS_SPEICHERN = false` in `services/schildAbschluss.ts`.
+  - `SchulabschlussAllgemeinbildend` — liefert die `idAbschluss`-Werte für den Abschluss-PATCH
+    (OA `0`, ESA `2001`, EESA `5001`, MSA `10000`, MSA-Q `11000`; `KATALOG_ID` in
+    `services/schildAbschluss.ts`). Ändern sich dort IDs, muss `KATALOG_ID` nachgezogen werden.
   - `ZulaessigeKursart` (z. B. `E`, `G`, `WPI`, `EGSN` — siehe `prognoseEingabe.ts`),
     `Fach` (Statistik-Kürzel), `Note`, `Schulform`, `Jahrgaenge`.
 
@@ -298,7 +298,6 @@ Nach einem Update prüfen, ob sich etwas für Prognos geändert hat:
 |---|---|
 | `NotenbildView` | Platzhalter („Implementierung folgt“), Route `notenbilder` existiert |
 | `EinstellungenView` | Platzhalter („Implementierung folgt“), Route `einstellungen` existiert |
-| Abschluss speichern | `ABSCHLUSS_SPEICHERN = false` (`schildAbschluss.ts`): Server lehnt `GE/APO-SI20/…` ab, s. Abschnitt OpenAPI/Kataloge. Gespeichert werden trotzdem `abschlussart`, `istAbschlussPrognose`, `pruefungsOrdnung`, Protokolltext, LBNW-Note und geänderte Noten |
 | `prognoseStore` | Vorhanden, aber ungenutzt |
 | `svwsService.ts` Legacy | `loadKlassen`, `loadSchueler`, `loadNotenbild` (für NotenbildView vorgesehen) und `loadPrognoseLeistungsdaten` (nur Abgleich gegen den Server) ohne Aufrufer |
 
@@ -321,7 +320,7 @@ Nach einem Update prüfen, ob sich etwas für Prognos geändert hat:
 
 ```bash
 npm run dev          # Vite Dev-Server (mit CORS-Proxy für SVWS)
-npm run test         # Vitest (106 Tests, davon 78 APO-SI20-Fälle)
+npm run test         # Vitest (107 Tests, davon 78 APO-SI20-Fälle)
 npx tsc --noEmit     # TypeScript-Check ohne Build
 npm run electron:dev # Electron-App (erfordert vorherigen Build)
 npm run build        # Produktions-Build nach dist/
@@ -367,3 +366,10 @@ npm run build        # Produktions-Build nach dist/
      Der SVWS-Server kennt keinen Quartalsbetrieb mehr: Abschnitt = Halbjahr, pro Abschnitt
      gibt es eine Quartals- und eine Halbjahresnote (`noteQuartal`/`note`). Die Umrechnung
      von vier Abschnitten in PM2 (`GetPM2Halbjahr`) ist daher bewusst nicht übernommen.
+
+9. **Abschluss speichern** (ADR 0018): Zwei PATCHes — erst `/schueler/lernabschnittsdaten/{id}`
+   (Prüfungsordnung in Langform `GE/APO-SI20/5-10`, Prognose-Flag, LBNW), dann
+   `/abschluesse/schueler/lernabschnittsdaten/{id}` mit `idAbschluss` (Katalog-ID, kein Kürzel).
+   Mit Quartalsnoten gerechnet → `idAbschlussQuartalsprognose`/`textErgebniseQuartalsprognose`.
+   Server-Eigenheiten: Langform der PO am neuen Endpunkt → 400; ungültige ID → still `null`
+   (daher Antwort prüfen); `null` für `idAbschluss`/`idAbschlussQuartalsprognose` → 500.
