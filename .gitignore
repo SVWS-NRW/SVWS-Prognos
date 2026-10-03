@@ -37,3 +37,6 @@ Thumbs.db
 # Quellcode der alten Delphi-Anwendung (nur zur lokalen Analyse, nicht einchecken)
 delphiSrc/
 
+
+# Netzwerk-Mitschnitte aus dem Browser (enthalten Schülerdaten und Zugangsdaten)
+*.har
