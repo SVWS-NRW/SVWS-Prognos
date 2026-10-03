@@ -26,6 +26,54 @@
     </Message>
 
     <div class="tile-grid">
+      <!-- Schuldaten (Info-Kachel, nicht navigierbar) -->
+      <div class="tile tile--info">
+        <div class="tile-icon"><i class="pi pi-building" /></div>
+        <div class="tile-body">
+          <span class="tile-title">Schuldaten</span>
+          <dl class="info-list">
+            <dt>Schulform</dt>
+            <dd>{{ auth.schulformKuerzel || '–' }}</dd>
+            <dt>Schema</dt>
+            <dd>{{ auth.schema }}</dd>
+            <dt>Server</dt>
+            <dd class="url">{{ auth.baseUrl }}</dd>
+            <dt>Benutzer</dt>
+            <dd>{{ auth.username }}</dd>
+            <dt>Abschnitt</dt>
+            <dd>{{ abschnittStore.ausgewaehlt?.bezeichnung ?? '–' }}</dd>
+          </dl>
+        </div>
+      </div>
+
+      <!-- Auswertungen -->
+      <div
+        class="tile"
+        :class="auth.schulformUnterstuetzt ? 'tile--nav' : 'tile--gesperrt'"
+        @click="auth.schulformUnterstuetzt && router.push({ name: 'auswertungen' })"
+      >
+        <div class="tile-icon"><i class="pi pi-chart-bar" /></div>
+        <div class="tile-body">
+          <span class="tile-title">Auswertungen</span>
+          <span class="tile-sub">Statistiken und Übersichten</span>
+        </div>
+        <i class="pi pi-chevron-right tile-arrow" />
+      </div>
+
+      <!-- Manuelle Prognose -->
+      <div
+        class="tile"
+        :class="auth.schulformUnterstuetzt ? 'tile--nav tile--accent' : 'tile--gesperrt'"
+        @click="auth.schulformUnterstuetzt && router.push({ name: 'manuell' })"
+      >
+        <div class="tile-icon"><i class="pi pi-pencil" /></div>
+        <div class="tile-body">
+          <span class="tile-title">Manuelle Prognose</span>
+          <span class="tile-sub">Noten eingeben oder JSON importieren</span>
+        </div>
+        <i class="pi pi-chevron-right tile-arrow" />
+      </div>
+
       <!-- Jahrgang 8 -->
       <div
         class="tile"
@@ -66,54 +114,6 @@
           <span class="tile-sub">Schülerprognosen erstellen</span>
         </div>
         <i class="pi pi-chevron-right tile-arrow" />
-      </div>
-
-      <!-- Manuelle Prognose -->
-      <div
-        class="tile"
-        :class="auth.schulformUnterstuetzt ? 'tile--nav tile--accent' : 'tile--gesperrt'"
-        @click="auth.schulformUnterstuetzt && router.push({ name: 'manuell' })"
-      >
-        <div class="tile-icon"><i class="pi pi-pencil" /></div>
-        <div class="tile-body">
-          <span class="tile-title">Manuelle Prognose</span>
-          <span class="tile-sub">Noten eingeben oder JSON importieren</span>
-        </div>
-        <i class="pi pi-chevron-right tile-arrow" />
-      </div>
-
-      <!-- Auswertungen -->
-      <div
-        class="tile"
-        :class="auth.schulformUnterstuetzt ? 'tile--nav' : 'tile--gesperrt'"
-        @click="auth.schulformUnterstuetzt && router.push({ name: 'auswertungen' })"
-      >
-        <div class="tile-icon"><i class="pi pi-chart-bar" /></div>
-        <div class="tile-body">
-          <span class="tile-title">Auswertungen</span>
-          <span class="tile-sub">Statistiken und Übersichten</span>
-        </div>
-        <i class="pi pi-chevron-right tile-arrow" />
-      </div>
-
-      <!-- Schuldaten (Info-Kachel, nicht navigierbar) -->
-      <div class="tile tile--info">
-        <div class="tile-icon"><i class="pi pi-building" /></div>
-        <div class="tile-body">
-          <span class="tile-title">Schuldaten</span>
-          <dl class="info-list">
-            <dt>Schulform</dt>
-            <dd>{{ auth.schulformKuerzel || '–' }}</dd>
-            <dt>Schema</dt>
-            <dd>{{ auth.schema }}</dd>
-            <dt>Server</dt>
-            <dd class="url">{{ auth.baseUrl }}</dd>
-            <dt>Benutzer</dt>
-            <dd>{{ auth.username }}</dd>
-            <dt>Abschnitt</dt>
-            <dd>{{ abschnittStore.ausgewaehlt?.bezeichnung ?? '–' }}</dd>
-          </dl>
-        </div>
       </div>
     </div>
   </div>

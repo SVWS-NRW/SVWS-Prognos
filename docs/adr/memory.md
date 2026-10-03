@@ -84,7 +84,7 @@ src/
 │   └── prognose.ts          # notenbilder/ergebnisse (Map) — derzeit ungenutzt
 └── views/
     ├── ConnectView.vue           # Login-Formular → authStore.connect()
-    ├── DashboardView.vue         # 6 Kacheln: Jg 8/9/10, Manuell, Auswertungen, Schuldaten
+    ├── DashboardView.vue         # 6 Kacheln: Schuldaten, Auswertungen, Manuell; darunter Jg 8/9/10
     ├── SchuelerauswahlView.vue   # Schülertabelle je Jahrgang: Abschnitt-, Status-, Klassenfilter,
     │                             # gespeicherter Abschluss/Prognose je Schüler
     ├── PrognoseView.vue          # ⭐ Prognose eines Schülers aus SVWS-Daten: Halbjahr/Quartal,
@@ -324,7 +324,7 @@ Ansicht startet wieder im aktuellen Abschnitt. Hintergrund: Die Auswahlliste fü
 - **Keine Comments**: Nur wenn der *Warum* nicht offensichtlich ist
 - **Keine Features auf Vorrat**: Kein Over-Engineering
 - **Imports**: `@/` alias für `src/`, kein relativer Import über Verzeichnisgrenzen
-- **PrimeVue-Größen**: Immer `size="small"` in kompakten Views
+- **PrimeVue-Größen**: `size="small"` in kompakten Views; Header von Schülerliste und PrognoseView in Standardgröße (Titel 1.35rem, Theme-Button 2.5rem)
 - **v-for Reaktivität**: Immer `faecher[idx].field = v` statt `fach.field = v`
 - **Kein localStorage für Credentials**: Strikt — authStore ist RAM-only
 

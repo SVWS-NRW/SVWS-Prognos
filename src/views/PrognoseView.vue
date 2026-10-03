@@ -6,17 +6,15 @@
       <Button
         icon="pi pi-list"
         text
-        size="small"
         title="Zurück zur Schülertabelle"
         @click="pruefeUndNavigiere(zurSchuelerliste)"
       />
-      <Button icon="pi pi-arrow-left" text size="small" @click="pruefeUndNavigiere(() => router.back())" />
+      <Button icon="pi pi-arrow-left" text @click="pruefeUndNavigiere(() => router.back())" />
       <span class="toolbar-title">{{ schuelerName }}<span v-if="schuelerKlasse" class="toolbar-klasse"> · {{ schuelerKlasse }}</span><span class="toolbar-klasse" title="ID des Schülerdatensatzes"> · ID {{ schuelerId }}</span></span>
       <Button
         v-if="naechsterSchueler"
         icon="pi pi-arrow-right"
         text
-        size="small"
         class="btn-naechster"
         :title="`Nächster: ${naechsterSchueler.nachname}, ${naechsterSchueler.vorname}`"
         @click="navigiereZuNaechstem"
@@ -27,7 +25,6 @@
         :options="abschnittOptionen"
         option-label="label"
         option-value="value"
-        size="small"
         class="abschnitt-select"
         @update:model-value="laden"
       />
@@ -36,7 +33,6 @@
         :options="notenModusOptionen"
         option-label="label"
         option-value="value"
-        size="small"
         class="noten-toggle"
       />
       <Select
@@ -44,8 +40,7 @@
         :options="schulformOptionen"
         option-label="label"
         option-value="value"
-        size="small"
-        style="width: 11rem"
+        style="width: 12rem"
       />
       <ThemeToggle />
     </div>
@@ -1044,7 +1039,7 @@ function mapKursart(k: string | null): 'E' | 'G' | 'Sonstige' {
   flex-wrap: wrap;
 }
 .toolbar-title {
-  font-size: 0.9rem;
+  font-size: 1.35rem;
   font-weight: 600;
   white-space: nowrap;
 }
@@ -1054,8 +1049,9 @@ function mapKursart(k: string | null): 'E' | 'G' | 'Sonstige' {
 }
 .toolbar-sep  { flex: 1; }
 .btn-naechster :deep(.p-button-icon) { color: #16a34a; }
-.abschnitt-select { width: 16rem; flex-shrink: 0; }
+.abschnitt-select { width: 17rem; flex-shrink: 0; }
 .noten-toggle { flex-shrink: 0; }
+.toolbar :deep(.theme-btn) { width: 2.5rem; height: 2.5rem; font-size: 1rem; }
 
 .status-hint {
   display: flex;

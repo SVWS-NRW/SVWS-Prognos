@@ -1,17 +1,16 @@
 <template>
   <div class="page">
     <div class="toolbar">
-      <Button icon="pi pi-arrow-left" text size="small" @click="router.push({ name: 'dashboard' })" />
+      <Button icon="pi pi-arrow-left" text @click="router.push({ name: 'dashboard' })" />
       <span class="toolbar-title">Jahrgang {{ jg }}</span>
       <div class="toolbar-sep" />
       <span class="abschnitt-anzeige" title="Listen und Auswertungen zeigen immer den aktuellen Schuljahresabschnitt">{{ abschnittStore.ausgewaehlt?.bezeichnung ?? '–' }}</span>
-      <Button icon="pi pi-refresh" text size="small" title="Neu laden" :loading="schuelerStore.abschlussLaedt" @click="neuLaden" />
+      <Button icon="pi pi-refresh" text title="Neu laden" :loading="schuelerStore.abschlussLaedt" @click="neuLaden" />
       <Select
         v-model="selectedStatus"
         :options="statusOptionen"
         option-label="label"
         option-value="value"
-        size="small"
         class="status-select"
       />
       <Select
@@ -21,7 +20,6 @@
         option-value="value"
         placeholder="Alle Klassen"
         show-clear
-        size="small"
         class="klassen-select"
       />
       <ThemeToggle />
@@ -91,7 +89,13 @@
               <td class="td-klasse">{{ s.klasseKuerzel }}</td>
               <td class="td-abschluss">{{ formatAbschluss(s) }}</td>
               <td class="td-po">{{ formatPruefungsordnung(s) }}</td>
-              <td class="td-prognose">{{ formatPrognose(s) }}</td>
+              <td class="td-prognose">
+                <template v-if="s.svwsIstAbschlussPrognose === undefined">…</template>
+                <template v-else-if="s.svwsIstAbschlussPrognose === null">–</template>
+                <i v-else-if="!s.svwsAbschluss" class="pi pi-times prognose-fehlt" title="Noch kein Abschluss berechnet" />
+                <span v-else-if="s.svwsIstAbschlussPrognose" class="prognose-p" title="Prognose">P</span>
+                <span v-else class="prognose-a" title="Endgültiger Abschluss">A</span>
+              </td>
               <td class="td-action">
                 <i class="pi pi-chevron-right action-icon" />
               </td>
@@ -228,12 +232,6 @@ function formatPruefungsordnung(s: { svwsPruefungsOrdnung?: string | null; svwsA
   return '–'
 }
 
-function formatPrognose(s: { svwsIstAbschlussPrognose?: boolean | null }): string {
-  if (s.svwsIstAbschlussPrognose === undefined) return '…'
-  if (s.svwsIstAbschlussPrognose === null) return '–'
-  return s.svwsIstAbschlussPrognose ? 'P' : '✓'
-}
-
 async function neuLaden() {
   const id = abschnittStore.ausgewaehltId
   if (id) await laden(id, true)
@@ -283,13 +281,14 @@ function navigiereZurPrognose(schuelerId: number) {
   gap: 0.5rem;
 }
 .toolbar-title {
-  font-size: 1.05rem;
+  font-size: 1.35rem;
   font-weight: 600;
 }
 .toolbar-sep { flex: 1; }
-.abschnitt-anzeige { font-size: 0.9rem; color: var(--p-text-muted-color); white-space: nowrap; }
-.status-select { width: 14rem; }
-.klassen-select { width: 14rem; }
+.abschnitt-anzeige { font-size: 1.05rem; color: var(--p-text-muted-color); white-space: nowrap; }
+.status-select { width: 15rem; }
+.klassen-select { width: 15rem; }
+.toolbar :deep(.theme-btn) { width: 2.5rem; height: 2.5rem; font-size: 1rem; }
 
 .status-hint {
   display: flex;
@@ -329,7 +328,6 @@ function navigiereZurPrognose(schuelerId: number) {
 .schueler-table th {
   text-align: left;
   padding: 0.5rem 1rem;
-  font-size: 0.85rem;
   font-weight: 500;
   color: var(--p-text-muted-color);
   border-bottom: 1px solid var(--p-content-border-color);
@@ -366,6 +364,9 @@ function navigiereZurPrognose(schuelerId: number) {
 .td-klasse    { color: var(--p-text-muted-color); }
 .td-abschluss { font-weight: 500; }
 .td-prognose  { color: var(--p-text-muted-color); text-align: center; }
+.prognose-p  { color: var(--prog-prognose); font-weight: 700; }
+.prognose-a  { color: var(--prog-abschluss); font-weight: 700; }
+.prognose-fehlt { color: var(--abschluss-nicht); font-size: 0.85rem; font-weight: 700; }
 .td-action    { text-align: right; }
 .action-icon { font-size: 0.85rem; color: var(--p-text-muted-color); }
 

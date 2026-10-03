@@ -26,6 +26,10 @@
   --abschluss-sicher:    #16a34a;
   --abschluss-unsicher:  #ca8a04;
   --abschluss-nicht:     #dc2626;
+
+  /* Gespeicherter Abschluss: Prognose (P) / endgültiger Abschluss (A) */
+  --prog-prognose:       #15803d;
+  --prog-abschluss:      #2563eb;
 }
 
 :root.dark {
@@ -52,6 +56,9 @@
   --abschluss-sicher:    #4ade80;
   --abschluss-unsicher:  #fbbf24;
   --abschluss-nicht:     #f87171;
+
+  --prog-prognose:       #4ade80;
+  --prog-abschluss:      #60a5fa;
 }
 
 /* ── Body ─────────────────────────────────────────────────────────────────── */

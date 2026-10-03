@@ -38,15 +38,15 @@ Das Dashboard zeigt sechs Kacheln:
 
 ```
 ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
-│       8         │  │       9         │  │      10         │
-│  Jahrgang 8     │  │  Jahrgang 9     │  │  Jahrgang 10    │
-│  Schülerprognos.│  │  Schülerprognos.│  │  Schülerprognos.│
+│  🏫 Schuldaten  │  │  📊 Auswertungen│  │  ✏ Manuelle     │
+│  Schema: ...    │  │  (folgt)        │  │  Prognose       │
+│  Server: ...    │  │                 │  │  JSON importier.│
 └─────────────────┘  └─────────────────┘  └─────────────────┘
 
 ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
-│  ✏ Manuelle     │  │  📊 Auswertungen│  │  🏫 Schuldaten  │
-│  Prognose       │  │  (folgt)        │  │  Schema: ...    │
-│  JSON importier.│  │                 │  │  Server: ...    │
+│       8         │  │       9         │  │      10         │
+│  Jahrgang 8     │  │  Jahrgang 9     │  │  Jahrgang 10    │
+│  Schülerprognos.│  │  Schülerprognos.│  │  Schülerprognos.│
 └─────────────────┘  └─────────────────┘  └─────────────────┘
 ```
 
