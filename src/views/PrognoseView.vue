@@ -140,6 +140,7 @@
                 </td>
                 <td :class="{ 'note--rot': lbnwNote !== null && lbnwNote >= 5 }">
                   <Select
+                    :ref="el => setzeNotenfeld(0, el)"
                     :model-value="lbnwNote"
                     :options="noteOptionen"
                     option-label="label"
@@ -147,6 +148,8 @@
                     size="small"
                     class="w-note"
                     @update:model-value="v => lbnwNote = v ?? null"
+                    @keydown.capture="(e: KeyboardEvent) => onNotenfeldKeydown(e, 0, v => lbnwNote = v)"
+                    @hide="onNotenfeldHide(0)"
                   />
                 </td>
                 <td>
@@ -177,6 +180,7 @@
                 </td>
                 <td :class="{ 'note--rot': fach.note != null && fach.note >= 5 }">
                   <Select
+                    :ref="el => setzeNotenfeld(idx + 1, el)"
                     :model-value="fach.note"
                     :options="noteOptionen"
                     option-label="label"
@@ -184,6 +188,8 @@
                     size="small"
                     class="w-note"
                     @update:model-value="v => faecher[idx].note = v ?? null"
+                    @keydown.capture="(e: KeyboardEvent) => onNotenfeldKeydown(e, idx + 1, v => faecher[idx].note = v)"
+                    @hide="onNotenfeldHide(idx + 1)"
                   />
                 </td>
                 <td>
@@ -318,6 +324,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
+import type { ComponentPublicInstance } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import Select from 'primevue/select'
@@ -625,6 +632,49 @@ const noteOptionen = [
   { label: '5', value: 5 },
   { label: '6', value: 6 },
 ]
+
+// Noteneingabe per Tastatur: Ziffer 1–6 setzt die Note, Entf/Rücktaste leert sie,
+// Enter springt ins Notenfeld darunter. Position 0 = LBNW, danach die Fächer.
+type Notenfeld = ComponentPublicInstance & { hide: (isFocus?: boolean) => void }
+const notenfelder: Array<Notenfeld | null> = []
+let springeNachSchliessen: number | null = null
+
+function setzeNotenfeld(pos: number, el: Element | ComponentPublicInstance | null) {
+  notenfelder[pos] = el as Notenfeld | null
+}
+
+function notenfeldCombobox(pos: number): HTMLElement | null {
+  return notenfelder[pos]?.$el?.querySelector?.('[role="combobox"]') ?? null
+}
+
+function onNotenfeldKeydown(event: KeyboardEvent, pos: number, setze: (note: number | null) => void) {
+  if (event.ctrlKey || event.metaKey || event.altKey) return
+  const offen = notenfeldCombobox(pos)?.getAttribute('aria-expanded') === 'true'
+  if (/^[1-6]$/.test(event.key)) {
+    setze(Number(event.key))
+  } else if (event.key === 'Delete' || event.key === 'Backspace') {
+    setze(null)
+  } else if (event.key === 'Enter') {
+    // Offene Liste: Select übernimmt die per Pfeiltaste gewählte Option, fokussiert sich
+    // danach aber selbst wieder – deshalb erst nach dem Schließen springen
+    if (offen) {
+      springeNachSchliessen = pos
+      return
+    }
+    notenfeldCombobox(pos + 1)?.focus()
+  } else {
+    return
+  }
+  event.preventDefault()
+  event.stopPropagation()
+  if (offen) notenfelder[pos]?.hide()
+}
+
+function onNotenfeldHide(pos: number) {
+  if (springeNachSchliessen !== pos) return
+  springeNachSchliessen = null
+  notenfeldCombobox(pos + 1)?.focus()
+}
 
 const schuelerName = computed(() => {
   const s = schuelerStore.schueler.find(s => s.id === schuelerId.value)

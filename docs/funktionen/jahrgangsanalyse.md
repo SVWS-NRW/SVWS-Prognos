@@ -77,6 +77,8 @@ Die Tabelle zeigt für jeden Schüler und jede Schülerin:
 
 Ein Klick auf eine Zeile öffnet die Detailansicht für diesen Schüler mit dem vollständigen Notenbild und dem Berechnungsprotokoll.
 
+Noten lassen sich dort auch per Tastatur eingeben: Notenfeld anklicken, Ziffer **1–6** tippen (Entf oder Rücktaste leert das Feld) und mit **Enter** ins Notenfeld darunter springen. So geben Sie alle Noten schnell von oben nach unten ein.
+
 ---
 
 ## Spaltenwidths anpassen
