@@ -114,7 +114,12 @@ Wenn Sie SVWS-Prognos auf einem Schulserver als Web-Anwendung bereitstellen möc
 Liegt die Web-App auf einem öffentlich erreichbaren Webspace, der SVWS-Server aber im Schulnetz oder auf dem eigenen Rechner (`localhost`), greift eine öffentliche Seite auf ein lokales Netz zu. Aktuelle Browser erlauben das nur mit ausdrücklicher Zustimmung („Local Network Access“):
 
 - **Chrome/Edge:** Ohne Freigabe schlagen alle Anfragen fehl. Freigabe über das Symbol links neben der Adresse → Website-Einstellungen → „Lokales Netzwerk“ → Zulassen.
-- **Firefox:** Freigabe über das Berechtigungs-Symbol neben der Adresse („Auf dieses Gerät zugreifen“) dauerhaft auf „Erlaubt“ setzen und **Firefox danach neu starten**. Ist die Freigabe nur „Temporär erlaubt“ oder wurde sie in der laufenden Sitzung geändert, scheitern einzelne Anfragen (Fehler „CORS Failed“, z. B. fehlende Abschlussdaten bei manchen Schülern).
+- **Firefox:** Die Freigabe über das Berechtigungs-Symbol neben der Adresse („Auf dieses Gerät zugreifen“) reicht nicht zuverlässig: Auch dauerhaft erlaubt und nach einem Neustart scheitern viele Anfragen (Fehler „CORS Failed“, z. B. fehlende Abschlussdaten bei vielen Schülern; getestet mit Firefox 156). Stattdessen die Adresse der Web-App von der Prüfung ausnehmen:
+  1. `about:config` in die Adresszeile eingeben und die Warnung bestätigen.
+  2. Nach `network.lna.skip-domains` suchen, als **Text** anlegen und den Hostnamen der Web-App eintragen, z. B. `prognos.ihre-schule.de` (ohne `https://` und ohne Pfad).
+  3. **Firefox komplett neu starten** – vorher wirkt die Einstellung nicht.
+
+  `network.lna.blocking` = `false` ist kein Ersatz: Die Einstellung gehört zum Tracking-Schutz, und Firefox setzt sie bei „Standard“ und „Streng“ selbst wieder zurück. Außerdem würde sie für **alle** Webseiten gelten.
 
 Verwendet der SVWS-Server ein selbstsigniertes Zertifikat, muss der Browser diesem außerdem vertrauen, sonst scheitert bereits die Anmeldung – siehe [SSL-Zertifikatsfehler](hilfe.md#ssl-zertifikatsfehler).
 
