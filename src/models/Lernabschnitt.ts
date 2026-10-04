@@ -3,6 +3,7 @@ export type Kursart = 'E' | 'G' | 'ZK' | 'LK' | string
 export interface SvwsLeistungsdaten {
   id: number
   fachID: number
+  kursID: number | null
   kursart: string | null
   note: string | null
   noteQuartal: string | null

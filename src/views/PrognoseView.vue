@@ -118,17 +118,20 @@
             <thead>
               <tr>
                 <th>ASD-Kürzel</th>
+                <th>Fach-Kurs-Kürzel</th>
                 <th>Bezeichnung</th>
                 <th>Note</th>
                 <th>Kursart</th>
+                <th title="Fach von der Prognose ausschließen">Ign.</th>
                 <th title="Fremdsprache">FS</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
               <tr>
+                <td></td>
                 <td>
-                  <InputText model-value="LBNW" size="small" class="w-kuerzel" readonly />
+                  <InputText model-value="LBNW" size="small" class="w-fachkuerzel" readonly />
                 </td>
                 <td>
                   <InputText model-value="Lernbereich Naturwissenschaften" size="small" class="w-bez" readonly />
@@ -153,16 +156,17 @@
                 <td class="col-center">
                   <Checkbox :model-value="false" :binary="true" disabled />
                 </td>
+                <td class="col-center">
+                  <Checkbox :model-value="false" :binary="true" disabled />
+                </td>
                 <td></td>
               </tr>
-              <tr v-for="(fach, idx) in faecher" :key="idx">
+              <tr v-for="(fach, idx) in faecher" :key="idx" :class="{ 'zeile--ignoriert': fach.ignorieren }">
                 <td>
-                  <InputText
-                    :model-value="fach.kuerzel"
-                    size="small"
-                    class="w-kuerzel"
-                    @update:model-value="v => faecher[idx].kuerzel = String(v ?? '').trim().toUpperCase()"
-                  />
+                  <InputText :model-value="fach.asdKuerzel" size="small" class="w-kuerzel" readonly />
+                </td>
+                <td>
+                  <InputText :model-value="fach.fachKuerzel" size="small" class="w-fachkuerzel" readonly @mouseenter="titelBeiUeberlauf" />
                 </td>
                 <td>
                   <InputText
@@ -194,6 +198,14 @@
                     size="small"
                     class="w-kursart"
                     @update:model-value="v => handleKursartChange(idx, v)"
+                  />
+                </td>
+                <td class="col-center">
+                  <Checkbox
+                    :model-value="fach.ignorieren"
+                    :binary="true"
+                    title="Fach von der Prognose ausschließen"
+                    @update:model-value="v => faecher[idx].ignorieren = Boolean(v)"
                   />
                 </td>
                 <td class="col-center">
@@ -241,6 +253,7 @@
           <div class="result-protokoll">
             <div class="plog plog--info">Berechnung wurde mit {{ notenModus === 'quartal' ? 'Quartalsnoten' : 'Halbjahresnoten' }} durchgeführt.</div>
             <div v-if="kursartAbweichungen.length > 0" class="plog plog--warn">⚠ {{ KURSARTEN_PRAEFIX }}{{ kursartAbweichungen.join(', ') }}</div>
+            <div v-if="ausgeschlosseneFaecher.length > 0" class="plog plog--warn">⚠ {{ AUSGESCHLOSSEN_PRAEFIX }}{{ ausgeschlosseneFaecher.join(', ') }}</div>
             <div class="plog">&nbsp;</div>
             <div
               v-for="(line, i) in ergebnis.protokoll"
@@ -303,6 +316,7 @@
         <template v-if="faecherGeloescht">Gelöschte Fächer werden dauerhaft aus dem SVWS-Server entfernt.<br></template>
         <template v-if="notenGeaendert">Geänderte Noten werden dauerhaft in den SVWS-Server übernommen.<br></template>
         <template v-if="kursartAbweichungen.length > 0">Geänderte Kursarten werden nicht in SVWS übernommen; sie sind im Prognosetext vermerkt.<br></template>
+        <template v-if="ausgeschlosseneFaecher.length > 0">Von der Prognose ausgeschlossene Fächer werden nicht in SVWS übernommen; sie sind im Prognosetext vermerkt.<br></template>
         <template v-if="neueFaecherVorhanden">
           <br><i class="pi pi-info-circle" style="color: var(--p-blue-500)" /> Neu hinzugefügte Fächer können hier nicht gespeichert werden und werden ignoriert. Fächer können nur in der Hauptanwendung (SVWS) angelegt werden.<br>
         </template>
@@ -342,6 +356,7 @@ import {
   patchLernabschnittsdaten,
   patchAbschlussdaten,
   loadSchuelerAbschnitte,
+  loadKursKuerzel,
   patchLeistungsdaten,
   deleteLeistungsdaten,
   parseNoteString,
@@ -370,6 +385,11 @@ interface FormFach {
   note: number | null
   kursart: 'E' | 'G' | 'Sonstige'
   istFremdsprache: boolean
+  // Manuell von der Prognose ausgeschlossen
+  ignorieren: boolean
+  // Statistik-Kürzel (ASD) und Kürzel des Fachs an der Schule (eindeutig); leer bei neu hinzugefügten Fächern
+  asdKuerzel: string
+  fachKuerzel: string
   svwsId: number | null
 }
 
@@ -474,6 +494,25 @@ function mitAngenommenenKursarten(liste: FormFach[]): FormFach[] {
     return a && roh?.kursart === a.svws ? { ...f, kursart: a.kursart } : f
   })
 }
+
+// Ausgeschlossene Fächer werden wie die Kursarten nur im Prognosetext vermerkt und beim Laden
+// wieder ausgeschlossen; erkannt am Fach-Kurs-Kürzel
+const AUSGESCHLOSSEN_PRAEFIX = 'Von der Prognose ausgeschlossen, nicht in SVWS gespeichert: '
+
+function mitAusgeschlossenenFaechern(liste: FormFach[]): FormFach[] {
+  const zeile = gespeicherterPrognosetext.value?.split('\n').find(z => z.startsWith(AUSGESCHLOSSEN_PRAEFIX))
+  if (!zeile) return liste
+  const ausgeschlossen = new Set(zeile.slice(AUSGESCHLOSSEN_PRAEFIX.length).split(', '))
+  return liste.map(f => f.svwsId !== null && ausgeschlossen.has(f.fachKuerzel) ? { ...f, ignorieren: true } : f)
+}
+
+function mitGespeichertenAnnahmen(liste: FormFach[]): FormFach[] {
+  return mitAusgeschlossenenFaechern(mitAngenommenenKursarten(liste))
+}
+
+const ausgeschlosseneFaecher = computed(() =>
+  kernfaecherNachOben(faecher.value).filter(f => f.ignorieren).map(f => f.fachKuerzel || f.kuerzel)
+)
 
 // Kursarten, die nur für die Prognose von den SVWS-Daten abweichend angenommen wurden
 const kursartAbweichungen = computed(() =>
@@ -718,7 +757,7 @@ function navigiereZuNaechstem() {
 // sortiert, nach einer Kursartänderung danach also anders; deshalb hier immer sortiert, sonst
 // weicht der Prognosetext nach Speichern und Neuladen vom gespeicherten ab
 const ergebnis = computed(() => {
-  const valid = kernfaecherNachOben(faecher.value).filter(f => f.kuerzel.trim() !== '' && f.note !== null)
+  const valid = kernfaecherNachOben(faecher.value).filter(f => !f.ignorieren && f.kuerzel.trim() !== '' && f.note !== null)
   if (valid.length === 0) return null
   const eingabe = valid.map(f => ({
     kuerzel: f.kuerzel,
@@ -740,7 +779,7 @@ const ergebnis = computed(() => {
 
 watch(notenModus, () => {
   if (rohFaecher.value.length === 0) return
-  faecher.value = kernfaecherNachOben(mitAngenommenenKursarten(rohFaecher.value.map(f => ({
+  faecher.value = kernfaecherNachOben(mitGespeichertenAnnahmen(rohFaecher.value.map(f => ({
     ...f,
     note: notenModus.value === 'quartal' ? f.noteQuartal : f.noteHalbjahr,
   }))))
@@ -824,6 +863,7 @@ async function laden(abschnittIdParam?: number, nachSpeichern = false) {
       // Der Server liefert die Leistungsdaten in wechselnder Reihenfolge; ohne feste Sortierung
       // ändert sich nach dem Neuladen die Fachreihenfolge im Prognosetext
       .sort((a, b) => a.fach.sortierung - b.fach.sortierung || a.ld.id - b.ld.id)
+    const kurse = await ladeKursKuerzel(belegungen.map(b => b.ld.kursID))
     const rechenKuerzel = ordneRechenKuerzelZu(belegungen.map(({ ld, fach }) => ({ fach, kursart: ld.kursart })))
 
     rohFaecher.value = belegungen.map(({ ld, fach }, i) => {
@@ -836,18 +876,25 @@ async function laden(abschnittIdParam?: number, nachSpeichern = false) {
         note: notenModus.value === 'quartal' ? noteQ : noteHj,
         kursart: mapKursart(ld.kursart),
         istFremdsprache: fach.istFremdsprache,
+        ignorieren: false,
         noteHalbjahr: noteHj,
         noteQuartal: noteQ,
+        asdKuerzel: fach.kuerzelStatistik ?? '',
+        // Mit Kurs, damit z.B. zweimal ER (Fachkurs und Kurs WS-3-Werte) unterscheidbar ist
+        fachKuerzel: ld.kursID !== null && kurse.get(ld.kursID) ? `${fach.kuerzel} · ${kurse.get(ld.kursID)}` : fach.kuerzel,
         svwsId: ld.id,
       } satisfies RohFach
     })
 
-    faecher.value = kernfaecherNachOben(mitAngenommenenKursarten(rohFaecher.value.map(f => ({
+    faecher.value = kernfaecherNachOben(mitGespeichertenAnnahmen(rohFaecher.value.map(f => ({
       kuerzel: f.kuerzel,
       bezeichnung: f.bezeichnung,
       note: notenModus.value === 'quartal' ? f.noteQuartal : f.noteHalbjahr,
       kursart: f.kursart,
       istFremdsprache: f.istFremdsprache,
+      ignorieren: false,
+      asdKuerzel: f.asdKuerzel,
+      fachKuerzel: f.fachKuerzel,
       svwsId: f.svwsId,
     }))))
 
@@ -859,6 +906,18 @@ async function laden(abschnittIdParam?: number, nachSpeichern = false) {
   } finally {
     laedt.value = false
   }
+}
+
+// Kurs-Kürzel bleiben für die nächsten Schüler zwischengespeichert; schlägt das Laden fehl,
+// wird nur das Fach-Kürzel angezeigt
+const kursKuerzelCache = new Map<number, Promise<string | null>>()
+
+async function ladeKursKuerzel(ids: Array<number | null>): Promise<Map<number, string | null>> {
+  const eindeutig = [...new Set(ids.filter((id): id is number => id !== null))]
+  for (const id of eindeutig) {
+    if (!kursKuerzelCache.has(id)) kursKuerzelCache.set(id, loadKursKuerzel(id).catch(() => null))
+  }
+  return new Map(await Promise.all(eindeutig.map(async id => [id, await kursKuerzelCache.get(id)!] as const)))
 }
 
 async function speichern() {
@@ -884,6 +943,9 @@ function verwerfenNoten() {
     note: notenModus.value === 'quartal' ? f.noteQuartal : f.noteHalbjahr,
     kursart: f.kursart,
     istFremdsprache: f.istFremdsprache,
+    ignorieren: false,
+    asdKuerzel: f.asdKuerzel,
+    fachKuerzel: f.fachKuerzel,
     svwsId: f.svwsId,
   })))
   lbnwNote.value = rawLernabschnitt.value?.noteLernbereichNW ?? null
@@ -939,8 +1001,10 @@ async function doSpeichern() {
       if (!rawLd) continue
       const noteField = notenModus.value === 'quartal' ? 'noteQuartal' : 'note'
       const noteStr = currentFach.note !== null ? String(currentFach.note) : null
+      // kursID nur zur Anzeige geladen, nicht zurückschreiben
+      const { kursID: _kursID, ...ldOhneKurs } = rawLd
       const patchBody = Object.fromEntries(
-        Object.entries({ ...rawLd, [noteField]: noteStr } as Record<string, unknown>)
+        Object.entries({ ...ldOhneKurs, [noteField]: noteStr } as Record<string, unknown>)
           .filter(([, v]) => v !== null)
       )
       await patchLeistungsdaten(rawLd.id, patchBody)
@@ -970,8 +1034,14 @@ function schliesseKursartWarnung() {
   showKursartWarnung.value = false
 }
 
+// Tooltip mit dem vollständigen Text nur, wenn er im Feld abgeschnitten ist
+function titelBeiUeberlauf(event: MouseEvent) {
+  const el = event.currentTarget as HTMLInputElement
+  el.title = el.scrollWidth > el.clientWidth ? el.value : ''
+}
+
 function addFach() {
-  faecher.value.push({ kuerzel: '', bezeichnung: '', note: null, kursart: 'Sonstige', istFremdsprache: false, svwsId: null })
+  faecher.value.push({ kuerzel: '', bezeichnung: '', note: null, kursart: 'Sonstige', istFremdsprache: false, ignorieren: false, asdKuerzel: '', fachKuerzel: '', svwsId: null })
 }
 
 function protokollText(empfehlung: AbschlussTyp, protokoll: string[]): string {
@@ -980,7 +1050,10 @@ function protokollText(empfehlung: AbschlussTyp, protokoll: string[]): string {
   const kursarten = kursartAbweichungen.value.length > 0
     ? [KURSARTEN_PRAEFIX + kursartAbweichungen.value.join(', ')]
     : []
-  return [kopf, `Prognose: ${ABSCHLUSS_KURZ[empfehlung]}`, ...kursarten, '', ...protokoll].join('\n')
+  const ausgeschlossen = ausgeschlosseneFaecher.value.length > 0
+    ? [AUSGESCHLOSSEN_PRAEFIX + ausgeschlosseneFaecher.value.join(', ')]
+    : []
+  return [kopf, `Prognose: ${ABSCHLUSS_KURZ[empfehlung]}`, ...kursarten, ...ausgeschlossen, '', ...protokoll].join('\n')
 }
 
 function protokollClass(line: string): string {
@@ -1126,13 +1199,21 @@ function mapKursart(k: string | null): 'E' | 'G' | 'Sonstige' {
   border-bottom: 1px solid var(--p-content-border-color);
   vertical-align: middle;
 }
+/* Alle Spalten so schmal wie ihr Inhalt, den Rest bekommt die Bezeichnung; dadurch stehen
+   ASD-Kürzel, Fach-Kürzel und Bezeichnung dicht zusammen */
+.faecher-table th:not(:nth-child(3)) { width: 1%; white-space: nowrap; }
+.faecher-table :is(th, td):nth-child(-n+2) { padding-right: 0.1rem; }
+.faecher-table :is(th, td):nth-child(2),
+.faecher-table :is(th, td):nth-child(3) { padding-left: 0.1rem; }
 .faecher-table tbody tr:last-child td { border-bottom: none; }
 .faecher-table tbody tr:hover { background: var(--p-highlight-background); }
 
 .note--rot :deep(.p-select-label) { color: #dc2626; font-weight: 600; }
 
 .col-center { text-align: center; }
-.w-kuerzel  { width: 5rem; }
+.zeile--ignoriert td:not(:nth-last-child(-n+3)) { opacity: 0.45; }
+.w-kuerzel  { width: 4rem; }
+.w-fachkuerzel { width: 7rem; text-overflow: ellipsis; }
 .w-bez      { width: 100%; min-width: 6rem; }
 .w-note     { width: 4rem; }
 /* Bei 4rem bleiben neben Pfeil und Innenabstand nur 2px für die Note; Chromium kürzt sie dann zu "5…" */

@@ -159,6 +159,9 @@ Die Konvertierung zwischen PM2-Kürzeln und SchILD-Feldwerten übernimmt
   im Protokoll auf dem Bildschirm) und werden beim
   Öffnen wieder angenommen, solange die Kursart in SVWS noch die notierte ist. „Speichern“ wird
   auch aktiv, wenn sich nur der Prognosetext ändert (Vergleich ohne Kopfzeile mit Zeitstempel).
+- Fächer lassen sich per Haken „Ign.“ von der Prognose ausschließen. Auch das wird nicht in SVWS
+  gespeichert, sondern im Prognosetext vermerkt („Von der Prognose ausgeschlossen, nicht in SVWS
+  gespeichert: ER · WS-3-Werte“) und beim Öffnen über das Fach-Kurs-Kürzel wieder gesetzt.
 - Nicht geschrieben werden `versetzungsvermerk` (eigene Berechnung, folgt später) und
   `nachpruefungen.moegliche` (Nachprüfungsfächer berechnet die Engine noch nicht).
 - Gelesen werden gespeicherte Abschlüsse über `schildZuAbschluss()`, das auch die

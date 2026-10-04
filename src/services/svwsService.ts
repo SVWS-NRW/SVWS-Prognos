@@ -144,6 +144,7 @@ export async function loadSvwsLernabschnittsdatenOderNull(
     leistungsdaten: (entry.leistungsdaten ?? []).map((l: any) => ({
       id: l.id,
       fachID: l.fachID,
+      kursID: l.kursID ?? null,
       kursart: l.kursart ?? null,
       note: l.note ?? null,
       noteQuartal: l.noteQuartal ?? null,
@@ -221,6 +222,11 @@ export async function patchAbschlussdaten(
 ): Promise<SvwsAbschlussdaten> {
   const { data } = await getApiClient().patch(`/abschluesse/schueler/lernabschnittsdaten/${lernabschnittId}`, felder)
   return mapAbschlussdaten(data)
+}
+
+export async function loadKursKuerzel(idKurs: number): Promise<string | null> {
+  const { data } = await getApiClient().get(`/kurse/${idKurs}`)
+  return data?.kuerzel || null
 }
 
 export async function patchLeistungsdaten(
