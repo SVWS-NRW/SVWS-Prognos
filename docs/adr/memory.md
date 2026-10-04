@@ -394,3 +394,9 @@ npm run build        # Produktions-Build nach dist/
    Prognosetext geht dann über die Lernabschnittsdaten. Angenommene Kursarten (nicht in SVWS
    gespeichert) stehen im Prognosetext und werden beim Öffnen wieder angenommen
    (`mitAngenommenenKursarten()`).
+
+10. **Fachreihenfolge im Prognosetext**: Das Protokoll listet die Fächer in Eingabereihenfolge.
+    Der Server liefert die Leistungsdaten eines Lernabschnitts in wechselnder Reihenfolge, daher
+    sortiert `PrognoseView.laden()` sie fest nach `FachDaten.sortierung` (dann Leistungs-ID), und
+    `kernfaecherNachOben()` bricht Gleichstände über diese Position. Sonst weicht der Text nach
+    Speichern und Neuladen vom gespeicherten ab und der Speichern-Dialog kommt erneut.

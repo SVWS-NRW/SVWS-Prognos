@@ -27,6 +27,7 @@ export async function loadFaecher(): Promise<FachDaten[]> {
     kuerzelStatistik: f.kuerzelStatistik ?? null,
     bezeichnung: f.bezeichnung ?? null,
     istFremdsprache: f.istFremdsprache === true,
+    sortierung: f.sortierung ?? 32000,
   }))
 }
 

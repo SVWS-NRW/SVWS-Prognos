@@ -4,4 +4,5 @@ export interface FachDaten {
   kuerzelStatistik: string | null
   bezeichnung: string | null
   istFremdsprache: boolean
+  sortierung: number
 }

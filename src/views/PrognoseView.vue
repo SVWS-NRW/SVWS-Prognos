@@ -117,7 +117,7 @@
           <table class="faecher-table">
             <thead>
               <tr>
-                <th>Kürzel</th>
+                <th>ASD-Kürzel</th>
                 <th>Bezeichnung</th>
                 <th>Note</th>
                 <th>Kursart</th>
@@ -477,7 +477,7 @@ function mitAngenommenenKursarten(liste: FormFach[]): FormFach[] {
 
 // Kursarten, die nur für die Prognose von den SVWS-Daten abweichend angenommen wurden
 const kursartAbweichungen = computed(() =>
-  faecher.value.flatMap(f => {
+  kernfaecherNachOben(faecher.value).flatMap(f => {
     const roh = rohFaecher.value.find(r => r.svwsId === f.svwsId)
     return roh && roh.kursart !== f.kursart ? [`${f.kuerzel}: ${f.kursart} (SVWS: ${roh.kursart})`] : []
   })
@@ -714,8 +714,11 @@ function navigiereZuNaechstem() {
   })
 }
 
+// Das Protokoll listet die Fächer in Eingabereihenfolge. Die Tabelle wird nur beim Laden
+// sortiert, nach einer Kursartänderung danach also anders; deshalb hier immer sortiert, sonst
+// weicht der Prognosetext nach Speichern und Neuladen vom gespeicherten ab
 const ergebnis = computed(() => {
-  const valid = faecher.value.filter(f => f.kuerzel.trim() !== '' && f.note !== null)
+  const valid = kernfaecherNachOben(faecher.value).filter(f => f.kuerzel.trim() !== '' && f.note !== null)
   if (valid.length === 0) return null
   const eingabe = valid.map(f => ({
     kuerzel: f.kuerzel,
@@ -818,6 +821,9 @@ async function laden(abschnittIdParam?: number, nachSpeichern = false) {
     const belegungen = lernabschnitt.leistungsdaten
       .map(ld => ({ ld, fach: faecherStore.faecherMap.get(ld.fachID) }))
       .filter((b): b is { ld: typeof b.ld; fach: FachDaten } => b.fach !== undefined)
+      // Der Server liefert die Leistungsdaten in wechselnder Reihenfolge; ohne feste Sortierung
+      // ändert sich nach dem Neuladen die Fachreihenfolge im Prognosetext
+      .sort((a, b) => a.fach.sortierung - b.fach.sortierung || a.ld.id - b.ld.id)
     const rechenKuerzel = ordneRechenKuerzelZu(belegungen.map(({ ld, fach }) => ({ fach, kursart: ld.kursart })))
 
     rohFaecher.value = belegungen.map(({ ld, fach }, i) => {
@@ -1011,8 +1017,14 @@ function sortierRang(fach: { kuerzel: string; kursart: string }): number {
   return 50
 }
 
-function kernfaecherNachOben<T extends { kuerzel: string; kursart: string }>(arr: T[]): T[] {
-  return [...arr].sort((a, b) => sortierRang(a) - sortierRang(b))
+// Bei gleichem Rang entscheidet die Position in SVWS, nicht die bisherige Zeile: So ergibt eine
+// geänderte Kursart dieselbe Reihenfolge wie nach dem Neuladen (neue Fächer ans Ende)
+function kernfaecherNachOben<T extends { kuerzel: string; kursart: string; svwsId: number | null }>(arr: T[]): T[] {
+  const svwsPos = (f: T) => {
+    const i = rohFaecher.value.findIndex(r => r.svwsId === f.svwsId)
+    return i === -1 ? Infinity : i
+  }
+  return [...arr].sort((a, b) => sortierRang(a) - sortierRang(b) || svwsPos(a) - svwsPos(b))
 }
 
 function mapKursart(k: string | null): 'E' | 'G' | 'Sonstige' {

@@ -4,7 +4,7 @@ import type { FachDaten } from '@/models/Fach'
 
 let id = 0
 function fach(kuerzel: string, kuerzelStatistik: string | null, istFremdsprache = false): FachDaten {
-  return { id: ++id, kuerzel, kuerzelStatistik, bezeichnung: null, istFremdsprache }
+  return { id: ++id, kuerzel, kuerzelStatistik, bezeichnung: null, istFremdsprache, sortierung: 32000 }
 }
 
 describe('rechenKuerzel', () => {
