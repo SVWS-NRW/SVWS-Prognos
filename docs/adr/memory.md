@@ -54,7 +54,9 @@ src/
 ├── style.css                # Design-Tokens (Light + Dark)
 ├── components/
 │   ├── ThemeToggle.vue      # Button: System/Hell/Dunkel (in jedem View-Header)
-│   └── LegalFooter.vue      # Hilfe-Link, Impressum- und Datenschutz-Modal (ConnectView)
+│   ├── LegalFooter.vue      # Hilfe-Link, Impressum- und Datenschutz-Modal (ConnectView)
+│   └── prognose/
+│       └── GruppenprognoseDialog.vue  # Modal der Schülerliste: Optionen, Fortschritt, Ergebnisliste
 ├── composables/
 │   └── useTheme.ts          # Theme-State (preference: Ref<'system'|'light'|'dark'>)
 ├── models/                  # Reine TypeScript-Interfaces, kein State
@@ -73,6 +75,10 @@ src/
 ├── services/
 │   ├── apiClient.ts         # Axios-Client (Basic Auth, Electron-/Browser-Proxy)
 │   ├── svwsService.ts       # SVWS-REST-Aufrufe inkl. Mapping (lesen + PATCH/DELETE)
+│   ├── prognoseBerechnung.ts # Prognose eines Schülers aus SVWS-Daten: laden, Fächer bauen, berechnen,
+│   │                        # Prognosetext, Vergleich mit Gespeichertem, speichern (+ Test); für
+│   │                        # Einzelansicht und Gruppenprognose
+│   ├── gruppenprognose.ts   # Bewertung je Schüler für die Gruppenprognose, paralleler Lauf (+ Test)
 │   ├── prognoseEingabe.ts   # Schul-Fachkürzel → Rechenkürzel der Engine (+ Test)
 │   ├── schildAbschluss.ts   # AbschlussTyp → Katalog-ID / Schild-Kürzel GE/APO-SI20/… (+ Test)
 │   └── errorService.ts      # toAppError(), useErrorService()
@@ -86,7 +92,8 @@ src/
     ├── ConnectView.vue           # Login-Formular → authStore.connect()
     ├── DashboardView.vue         # 6 Kacheln: Schuldaten, Auswertungen, Manuell; darunter Jg 8/9/10
     ├── SchuelerauswahlView.vue   # Schülertabelle je Jahrgang: Abschnitt-, Status-, Klassenfilter,
-    │                             # gespeicherter Abschluss/Prognose je Schüler
+    │                             # gespeicherter Abschluss/Prognose je Schüler; mit Klassenfilter
+    │                             # Markierung + Button „Gruppenprognose“
     ├── PrognoseView.vue          # ⭐ Prognose eines Schülers aus SVWS-Daten: Halbjahr/Quartal,
     │                             # Noten bearbeiten, Speichern (PATCH), Weiter zum nächsten Schüler
     ├── ManuellePrognoseView.vue  # Prognose ohne Server-Daten (Formular / JSON-Import)
@@ -177,12 +184,14 @@ interface EingabeFach {
 ### Tests
 
 ```bash
-npx vitest run   # 3 Testdateien, 107 Tests grün (davon 78 APO-SI20-Fälle)
+npx vitest run   # 5 Testdateien, 131 Tests grün (davon 78 APO-SI20-Fälle)
 ```
 
 `apoSI20.test.ts` liest automatisch alle `.json`/`.JSON`-Dateien aus `test-json/`
 (eingecheckt, 78 Dateien). Format: `{ input: { jahrgang, faecher }, Prognose: { abschluss } }`.
-Dazu kommen `services/prognoseEingabe.test.ts` und `services/schildAbschluss.test.ts`.
+Dazu kommen `services/prognoseEingabe.test.ts`, `services/schildAbschluss.test.ts` und
+`services/prognoseBerechnung.test.ts` (Fachreihenfolge, Rundlauf der Annahmen im Prognosetext) und
+`services/gruppenprognose.test.ts`.
 
 ---
 
@@ -334,7 +343,7 @@ Ansicht startet wieder im aktuellen Abschnitt. Hintergrund: Die Auswahlliste fü
 
 ```bash
 npm run dev          # Vite Dev-Server (mit CORS-Proxy für SVWS)
-npm run test         # Vitest (107 Tests, davon 78 APO-SI20-Fälle)
+npm run test         # Vitest (131 Tests, davon 78 APO-SI20-Fälle)
 npx tsc --noEmit     # TypeScript-Check ohne Build
 npm run electron:dev # Electron-App (erfordert vorherigen Build)
 npm run build        # Produktions-Build nach dist/
@@ -393,10 +402,17 @@ npm run build        # Produktions-Build nach dist/
    Abschluss wird dort nicht gespeichert (`abschlussNichtUnterstuetzt` in PrognoseView); der
    Prognosetext geht dann über die Lernabschnittsdaten. Angenommene Kursarten (nicht in SVWS
    gespeichert) stehen im Prognosetext und werden beim Öffnen wieder angenommen
-   (`mitAngenommenenKursarten()`).
+   (`faecherMitAnnahmen()` in `services/prognoseBerechnung.ts`), ebenso per Haken ausgeschlossene Fächer.
 
 10. **Fachreihenfolge im Prognosetext**: Das Protokoll listet die Fächer in Eingabereihenfolge.
     Der Server liefert die Leistungsdaten eines Lernabschnitts in wechselnder Reihenfolge, daher
-    sortiert `PrognoseView.laden()` sie fest nach `FachDaten.sortierung` (dann Leistungs-ID), und
+    sortiert `baueRohFaecher()` (`services/prognoseBerechnung.ts`) sie fest nach `FachDaten.sortierung` (dann Leistungs-ID), und
     `kernfaecherNachOben()` bricht Gleichstände über diese Position. Sonst weicht der Text nach
     Speichern und Neuladen vom gespeicherten ab und der Speichern-Dialog kommt erneut.
+
+11. **Gruppenprognose** (Schülerliste, nur mit Klassenfilter): markierte Schüler werden mit
+    demselben Service wie die Einzelansicht berechnet (`ladePrognoseKontext`, `faecherMitAnnahmen`,
+    `berechne`, `protokollText`, `speicherePrognose`), damit die Einzelansicht danach keinen
+    abweichenden Prognosetext meldet. Noten werden nie geändert, „Ist Prognose“ nach
+    `standardIstPrognose()`, Prüfungsordnung APO-SI20. Übersprungen: AOSF, ohne Noten, Jg. 8 mit
+    Quartal, endgültiger Abschluss (außer Option „überschreiben“). Gespeichert wird nur bei Änderung.

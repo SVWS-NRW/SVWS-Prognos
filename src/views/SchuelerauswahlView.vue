@@ -4,6 +4,15 @@
       <Button icon="pi pi-arrow-left" text @click="router.push({ name: 'dashboard' })" />
       <span class="toolbar-title">Jahrgang {{ jg }}</span>
       <div class="toolbar-sep" />
+      <Button
+        v-if="gruppenModus"
+        icon="pi pi-users"
+        label="Gruppenprognose"
+        outlined
+        :disabled="markiert.size === 0 || !abschnittStore.ausgewaehltId"
+        :title="markiert.size === 0 ? 'Zuerst Schüler markieren' : `Prognose für ${markiert.size} markierte Schüler berechnen`"
+        @click="zeigeGruppenprognose = true"
+      />
       <span class="abschnitt-anzeige" title="Listen und Auswertungen zeigen immer den aktuellen Schuljahresabschnitt">{{ abschnittStore.ausgewaehlt?.bezeichnung ?? '–' }}</span>
       <Button icon="pi pi-refresh" text title="Neu laden" :loading="schuelerStore.abschlussLaedt" @click="neuLaden" />
       <Select
@@ -34,12 +43,13 @@
 
     <template v-else>
       <div class="tabelle-header">
-        <span class="tabelle-info">{{ gefiltert.length }} Schüler</span>
+        <span class="tabelle-info">{{ gefiltert.length }} Schüler<template v-if="markiert.size > 0"> · {{ markiert.size }} markiert</template></span>
       </div>
 
       <div class="table-wrapper">
         <table class="schueler-table">
           <colgroup>
+            <col v-if="gruppenModus" class="col-markierung" />
             <col :style="{ width: spaltenBreiten[0] + 'px' }" />
             <col :style="{ width: spaltenBreiten[1] + 'px' }" />
             <col :style="{ width: spaltenBreiten[2] + 'px' }" />
@@ -50,6 +60,16 @@
           </colgroup>
           <thead>
             <tr>
+              <th v-if="gruppenModus" class="th-markierung">
+                <Checkbox
+                  :model-value="alleMarkiert"
+                  :indeterminate="markiert.size > 0 && !alleMarkiert"
+                  :binary="true"
+                  :disabled="gefiltert.length === 0"
+                  title="Alle markieren"
+                  @update:model-value="alleMarkieren"
+                />
+              </th>
               <th>
                 Nachname
                 <div class="col-resize-handle" @mousedown.prevent="startResize($event, 0)" />
@@ -84,6 +104,9 @@
               class="schueler-row"
               @click="navigiereZurPrognose(s.id)"
             >
+              <td v-if="gruppenModus" class="td-markierung" @click.stop="umschalten(s.id)">
+                <Checkbox :model-value="markiert.has(s.id)" :binary="true" @click.stop @update:model-value="umschalten(s.id)" />
+              </td>
               <td class="td-name">{{ s.nachname }}</td>
               <td>{{ s.vorname }}</td>
               <td class="td-klasse">{{ s.klasseKuerzel }}</td>
@@ -101,12 +124,19 @@
               </td>
             </tr>
             <tr v-if="gefiltert.length === 0">
-              <td colspan="7" class="td-empty">Keine Schüler für diesen Filter gefunden.</td>
+              <td :colspan="gruppenModus ? 8 : 7" class="td-empty">Keine Schüler für diesen Filter gefunden.</td>
             </tr>
           </tbody>
         </table>
       </div>
     </template>
+
+    <GruppenprognoseDialog
+      v-if="abschnittStore.ausgewaehltId"
+      v-model:visible="zeigeGruppenprognose"
+      :schueler="markierteSchueler"
+      :abschnitt-id="abschnittStore.ausgewaehltId"
+    />
   </div>
 </template>
 
@@ -116,9 +146,11 @@ import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import Select from 'primevue/select'
 import Message from 'primevue/message'
+import Checkbox from 'primevue/checkbox'
 import { useSchuelerStore } from '@/stores/schueler'
 import { useSchuljahresabschnittStore } from '@/stores/schuljahresabschnitt'
 import ThemeToggle from '@/components/ThemeToggle.vue'
+import GruppenprognoseDialog from '@/components/prognose/GruppenprognoseDialog.vue'
 import { ABSCHLUSS_KURZ, schildZuAbschluss } from '@/services/schildAbschluss'
 
 const route = useRoute()
@@ -163,6 +195,40 @@ const gefiltert = computed(() => {
   if (selectedKlasseId.value !== null)
     liste = liste.filter(s => s.klasseId === selectedKlasseId.value)
   return liste
+})
+
+// ---------------------------------------------------------------------------
+// Markierung (Vorbereitung für Gruppenprognosen)
+// ---------------------------------------------------------------------------
+// Es bleiben nur sichtbare Schüler markiert, damit nach einem Filterwechsel keine
+// ausgeblendeten Schüler mitverarbeitet werden; ohne Klassenfilter wird alles abgewählt
+const markiert = ref(new Set<number>())
+
+// Gruppenprognosen gibt es nur für eine Klasse
+const gruppenModus = computed(() => selectedKlasseId.value !== null)
+const zeigeGruppenprognose = ref(false)
+// In der Reihenfolge der Liste; beim Öffnen des Dialogs festgehalten
+const markierteSchueler = computed(() => gefiltert.value.filter(s => markiert.value.has(s.id)))
+
+const alleMarkiert = computed(() =>
+  gefiltert.value.length > 0 && gefiltert.value.every(s => markiert.value.has(s.id))
+)
+
+function umschalten(id: number) {
+  const neu = new Set(markiert.value)
+  if (!neu.delete(id)) neu.add(id)
+  markiert.value = neu
+}
+
+function alleMarkieren(wert: boolean) {
+  markiert.value = wert ? new Set(gefiltert.value.map(s => s.id)) : new Set()
+}
+
+watch(gefiltert, liste => {
+  const sichtbar = new Set(gruppenModus.value ? liste.map(s => s.id) : [])
+  if ([...markiert.value].some(id => !sichtbar.has(id))) {
+    markiert.value = new Set([...markiert.value].filter(id => sichtbar.has(id)))
+  }
 })
 
 // ---------------------------------------------------------------------------
@@ -360,6 +426,10 @@ function navigiereZurPrognose(schuelerId: number) {
   border-bottom: none;
 }
 
+.col-markierung { width: 3rem; }
+.schueler-table .th-markierung,
+.schueler-table .td-markierung { padding: 0 0 0 1rem; text-overflow: clip; }
+.td-markierung { cursor: default; }
 .td-name      { font-weight: 500; }
 .td-klasse    { color: var(--p-text-muted-color); }
 .td-abschluss { font-weight: 500; }

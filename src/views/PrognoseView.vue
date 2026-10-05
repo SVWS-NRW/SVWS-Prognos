@@ -342,7 +342,6 @@ import InputText from 'primevue/inputtext'
 import Checkbox from 'primevue/checkbox'
 import Message from 'primevue/message'
 import Dialog from 'primevue/dialog'
-import { berechnePrognose } from '@/rules'
 import type { AbschlussTyp } from '@/models/PrognoseErgebnis'
 import type { Schulform } from '@/rules/types'
 import { useAuthStore } from '@/stores/auth'
@@ -350,23 +349,35 @@ import { useSchuelerStore } from '@/stores/schueler'
 import { useSchuljahresabschnittStore } from '@/stores/schuljahresabschnitt'
 import { useFaecherStore } from '@/stores/faecher'
 import {
-  loadSvwsLernabschnittsdaten,
   loadPruefungsordnungen,
-  loadAbschlussdaten,
-  patchLernabschnittsdaten,
-  patchAbschlussdaten,
   loadSchuelerAbschnitte,
-  loadKursKuerzel,
   patchLeistungsdaten,
   deleteLeistungsdaten,
-  parseNoteString,
 } from '@/services/svwsService'
 import type { SchuelerAbschnitt, SvwsPruefungsordnung } from '@/services/svwsService'
-import { ordneRechenKuerzelZu } from '@/services/prognoseEingabe'
+import {
+  AUSGESCHLOSSEN_PRAEFIX,
+  KURSARTEN_PRAEFIX,
+  abschlussGeaendert as abschlussWeichtAb,
+  abschlussWirdGespeichert as abschlussWirdGespeichertFuer,
+  ausgeschlosseneFaecher as ausgeschlosseneFaecherVon,
+  berechne,
+  erzeugeKursKuerzelLader,
+  faecherMitAnnahmen,
+  faecherOhneAnnahmen,
+  gespeicherterPrognosetext as gespeicherterPrognosetextVon,
+  kursartAbweichungen as kursartAbweichungenVon,
+  ladePrognoseKontext,
+  prognosetextGeaendert as prognosetextWeichtAb,
+  prognosetextSpeicherbar as prognosetextSpeicherbarFuer,
+  protokollText as baueProtokollText,
+  speicherePrognose,
+  standardIstPrognose,
+} from '@/services/prognoseBerechnung'
+import type { NotenModus, PrognoseFach, PrognoseKontext, RohFach } from '@/services/prognoseBerechnung'
 import { toAppError } from '@/services/errorService'
 import { isAxiosError } from 'axios'
-import { ABSCHLUSS_KURZ, APO_SI20_PO, abschlussZuKatalogId, katalogIdZuAbschluss, abschlussZuSchild, abschlussartZuSchild, istAOSF, istApoSI20 } from '@/services/schildAbschluss'
-import type { FachDaten } from '@/models/Fach'
+import { ABSCHLUSS_KURZ, APO_SI20_PO, katalogIdZuAbschluss, abschlussZuSchild, abschlussartZuSchild, istAOSF, istApoSI20 } from '@/services/schildAbschluss'
 import type { SvwsAbschlussdaten, SvwsLernabschnittsdaten } from '@/models/Lernabschnitt'
 import ThemeToggle from '@/components/ThemeToggle.vue'
 
@@ -379,25 +390,8 @@ const schuelerStore = useSchuelerStore()
 const abschnittStore = useSchuljahresabschnittStore()
 const faecherStore = useFaecherStore()
 
-interface FormFach {
-  kuerzel: string
-  bezeichnung: string
-  note: number | null
-  kursart: 'E' | 'G' | 'Sonstige'
-  istFremdsprache: boolean
-  // Manuell von der Prognose ausgeschlossen
-  ignorieren: boolean
-  // Statistik-Kürzel (ASD) und Kürzel des Fachs an der Schule (eindeutig); leer bei neu hinzugefügten Fächern
-  asdKuerzel: string
-  fachKuerzel: string
-  svwsId: number | null
-}
 
-interface RohFach extends FormFach {
-  noteHalbjahr: number | null
-  noteQuartal: number | null
-  svwsId: number
-}
+type FormFach = PrognoseFach
 
 const laedt = ref(false)
 const fehler = ref<string | null>(null)
@@ -405,7 +399,7 @@ const faecher = ref<FormFach[]>([])
 const rohFaecher = ref<RohFach[]>([])
 const jahrgang = ref<string | null>(null)
 const schulform = ref<Schulform>(authStore.schulform)
-const notenModus = ref<'halbjahr' | 'quartal'>('halbjahr')
+const notenModus = ref<NotenModus>('halbjahr')
 const selectedAbschnittId = ref<number | null>(abschnittStore.ausgewaehltId)
 
 const rawLernabschnitt = ref<SvwsLernabschnittsdaten | null>(null)
@@ -438,98 +432,43 @@ const berechneterAbschlussCode = computed(() =>
 
 const berechneterAbschlussAnzeige = computed(() => berechneterAbschlussCode.value ?? '–')
 
-// Der Abschluss wird nur zusammen mit APO-SI20 gespeichert, weil nur dafür gerechnet wird
-const abschlussWirdGespeichert = computed(() => istApoSI20(selectedPO.value) && !abschlussNichtUnterstuetzt.value)
+// Der Kontext für den Service, zusammengesetzt aus dem zuletzt Geladenen
+const kontext = computed((): PrognoseKontext | null => rawLernabschnitt.value && {
+  lernabschnitt: rawLernabschnitt.value,
+  abschlussdaten: rawAbschlussdaten.value,
+  abschlussNichtUnterstuetzt: abschlussNichtUnterstuetzt.value,
+  rohFaecher: rohFaecher.value,
+})
 
-// Halbjahresnoten → idAbschluss + idAbschlussart, Quartalsnoten → idAbschlussQuartalsprognose
-function abschlussFelder(empfehlung: AbschlussTyp): Partial<SvwsAbschlussdaten> {
-  const id = abschlussZuKatalogId(empfehlung)
-  const text = protokollText(empfehlung, ergebnis.value?.protokoll ?? [])
-  return notenModus.value === 'quartal'
-    ? { idAbschlussQuartalsprognose: id, textErgebniseQuartalsprognose: text }
-    : { idAbschluss: id, idAbschlussart: abschlussartZuSchild(empfehlung), textErgebnisPruefungsalgorithmus: text }
-}
+const abschlussWirdGespeichert = computed(() => abschlussWirdGespeichertFuer(selectedPO.value, abschlussNichtUnterstuetzt.value))
 
-// Prognosetext: mit dem Abschluss über /abschluesse, in Jg. 8 (dort nicht unterstützt) über die
-// Lernabschnittsdaten — für die Quartalsprognose gibt es dort kein Feld
 const prognosetextSpeicherbar = computed(() =>
-  istApoSI20(selectedPO.value) && !nurAnsehen.value
-  && (!abschlussNichtUnterstuetzt.value || notenModus.value === 'halbjahr')
+  !nurAnsehen.value && prognosetextSpeicherbarFuer(selectedPO.value, abschlussNichtUnterstuetzt.value, notenModus.value)
 )
-
-function ohneKopfzeile(text: string | null | undefined): string | null {
-  return text ? text.split('\n').slice(1).join('\n') : null
-}
 
 const gespeicherterPrognosetext = computed(() =>
-  abschlussNichtUnterstuetzt.value
-    ? rawLernabschnitt.value?.textErgebnisPruefungsalgorithmus ?? null
-    : notenModus.value === 'quartal'
-      ? rawAbschlussdaten.value?.textErgebniseQuartalsprognose ?? null
-      : rawAbschlussdaten.value?.textErgebnisPruefungsalgorithmus ?? null
+  kontext.value ? gespeicherterPrognosetextVon(kontext.value, notenModus.value) : null
 )
 
-// Erfasst auch Änderungen, die den Abschluss nicht ändern (z.B. nur angenommene Kursarten)
+const kursartAbweichungen = computed(() => kursartAbweichungenVon(faecher.value, rohFaecher.value))
+const ausgeschlosseneFaecher = computed(() => ausgeschlosseneFaecherVon(faecher.value, rohFaecher.value))
+
+function protokollText(): string | null {
+  if (!ergebnis.value) return null
+  return baueProtokollText(ergebnis.value, faecher.value, rohFaecher.value, {
+    jahrgang: jahrgang.value, halbjahr: halbjahr.value, notenModus: notenModus.value,
+  })
+}
+
 const prognosetextGeaendert = computed(() => {
-  if (!prognosetextSpeicherbar.value || !ergebnis.value) return false
-  return ohneKopfzeile(protokollText(ergebnis.value.empfehlung, ergebnis.value.protokoll))
-    !== ohneKopfzeile(gespeicherterPrognosetext.value)
+  const text = prognosetextSpeicherbar.value ? protokollText() : null
+  return text !== null && prognosetextWeichtAb(text, gespeicherterPrognosetext.value)
 })
 
-// Kursarten werden nicht in SVWS geschrieben, sondern im Prognosetext vermerkt
-// ("FLD-Kursarten für die Prognose geändert, …: M: E (SVWS: Sonstige), …"). Beim Laden werden sie
-// wieder angenommen, solange die Kursart in SVWS noch die damals notierte ist.
-const KURSARTEN_PRAEFIX = 'FLD-Kursarten für die Prognose geändert, nicht in SVWS gespeichert: '
-
-function mitAngenommenenKursarten(liste: FormFach[]): FormFach[] {
-  const zeile = gespeicherterPrognosetext.value?.split('\n').find(z => z.startsWith(KURSARTEN_PRAEFIX))
-  if (!zeile) return liste
-  const angenommen = new Map<string, { kursart: FormFach['kursart']; svws: string }>()
-  for (const m of zeile.matchAll(/(\S+): (E|G|Sonstige) \(SVWS: (E|G|Sonstige)\)/g)) {
-    angenommen.set(m[1], { kursart: m[2] as FormFach['kursart'], svws: m[3] })
-  }
-  return liste.map(f => {
-    const a = angenommen.get(f.kuerzel)
-    const roh = rohFaecher.value.find(r => r.svwsId === f.svwsId)
-    return a && roh?.kursart === a.svws ? { ...f, kursart: a.kursart } : f
-  })
-}
-
-// Ausgeschlossene Fächer werden wie die Kursarten nur im Prognosetext vermerkt und beim Laden
-// wieder ausgeschlossen; erkannt am Fach-Kurs-Kürzel
-const AUSGESCHLOSSEN_PRAEFIX = 'Von der Prognose ausgeschlossen, nicht in SVWS gespeichert: '
-
-function mitAusgeschlossenenFaechern(liste: FormFach[]): FormFach[] {
-  const zeile = gespeicherterPrognosetext.value?.split('\n').find(z => z.startsWith(AUSGESCHLOSSEN_PRAEFIX))
-  if (!zeile) return liste
-  const ausgeschlossen = new Set(zeile.slice(AUSGESCHLOSSEN_PRAEFIX.length).split(', '))
-  return liste.map(f => f.svwsId !== null && ausgeschlossen.has(f.fachKuerzel) ? { ...f, ignorieren: true } : f)
-}
-
-function mitGespeichertenAnnahmen(liste: FormFach[]): FormFach[] {
-  return mitAusgeschlossenenFaechern(mitAngenommenenKursarten(liste))
-}
-
-const ausgeschlosseneFaecher = computed(() =>
-  kernfaecherNachOben(faecher.value).filter(f => f.ignorieren).map(f => f.fachKuerzel || f.kuerzel)
+const abschlussGeaendert = computed(() =>
+  abschlussWirdGespeichert.value && !!ergebnis.value
+  && abschlussWeichtAb(ergebnis.value.empfehlung, rawAbschlussdaten.value, notenModus.value)
 )
-
-// Kursarten, die nur für die Prognose von den SVWS-Daten abweichend angenommen wurden
-const kursartAbweichungen = computed(() =>
-  kernfaecherNachOben(faecher.value).flatMap(f => {
-    const roh = rohFaecher.value.find(r => r.svwsId === f.svwsId)
-    return roh && roh.kursart !== f.kursart ? [`${f.kuerzel}: ${f.kursart} (SVWS: ${roh.kursart})`] : []
-  })
-)
-
-const abschlussGeaendert = computed(() => {
-  if (!abschlussWirdGespeichert.value || !ergebnis.value) return false
-  const ad = rawAbschlussdaten.value
-  const id = abschlussZuKatalogId(ergebnis.value.empfehlung)
-  if (notenModus.value === 'quartal') return id !== (ad?.idAbschlussQuartalsprognose ?? null)
-  return id !== (ad?.idAbschluss ?? null)
-    || abschlussartZuSchild(ergebnis.value.empfehlung) !== (ad?.idAbschlussart ?? null)
-})
 
 // Nur APO-SI20 anbieten: Nur sie ist für Jg. 8–10 noch gültig und nur sie berechnet die Engine.
 // Andere Prüfungsordnungen der Schulform werden mit anderen Programmen berechnet.
@@ -556,7 +495,7 @@ const poOptionen = computed(() => {
 
 const lbnwNote = ref<number | null>(null)
 
-const halbjahr = computed(() =>
+const halbjahr = computed((): 1 | 2 | null =>
   abschnittStore.abschnitte.find(a => a.id === selectedAbschnittId.value)?.abschnitt ?? null
 )
 
@@ -753,36 +692,16 @@ function navigiereZuNaechstem() {
   })
 }
 
-// Das Protokoll listet die Fächer in Eingabereihenfolge. Die Tabelle wird nur beim Laden
-// sortiert, nach einer Kursartänderung danach also anders; deshalb hier immer sortiert, sonst
-// weicht der Prognosetext nach Speichern und Neuladen vom gespeicherten ab
-const ergebnis = computed(() => {
-  const valid = kernfaecherNachOben(faecher.value).filter(f => !f.ignorieren && f.kuerzel.trim() !== '' && f.note !== null)
-  if (valid.length === 0) return null
-  const eingabe = valid.map(f => ({
-    kuerzel: f.kuerzel,
-    note: f.note as number,
-    kursart: f.kursart,
-    bezeichnung: f.bezeichnung || undefined,
-    istFremdsprache: f.istFremdsprache || undefined,
-  }))
-  if (lbnwNote.value !== null) {
-    eingabe.push({ kuerzel: 'LBNW', note: lbnwNote.value, kursart: 'Sonstige', bezeichnung: undefined, istFremdsprache: undefined })
-  }
-  return berechnePrognose({
-    jahrgang: jahrgang.value,
-    halbjahr: halbjahr.value,
-    schulform: schulform.value,
-    faecher: eingabe,
-  })
-})
+const ergebnis = computed(() => berechne(faecher.value, rohFaecher.value, lbnwNote.value, {
+  jahrgang: jahrgang.value,
+  halbjahr: halbjahr.value,
+  schulform: schulform.value,
+  notenModus: notenModus.value,
+}))
 
 watch(notenModus, () => {
   if (rohFaecher.value.length === 0) return
-  faecher.value = kernfaecherNachOben(mitGespeichertenAnnahmen(rohFaecher.value.map(f => ({
-    ...f,
-    note: notenModus.value === 'quartal' ? f.noteQuartal : f.noteHalbjahr,
-  }))))
+  faecher.value = faecherMitAnnahmen(rohFaecher.value, notenModus.value, gespeicherterPrognosetext.value)
 })
 
 // Neuer Schüler: wieder mit dem Abschnitt der Schülerliste beginnen
@@ -828,17 +747,17 @@ async function laden(abschnittIdParam?: number, nachSpeichern = false) {
 
     await faecherStore.ensureLoaded()
 
-    const [lernabschnitt] = await Promise.all([
-      loadSvwsLernabschnittsdaten(schuelerId.value, abschnittId),
+    const [k] = await Promise.all([
+      ladePrognoseKontext(schuelerId.value, abschnittId, faecherStore.faecherMap, ladeKursKuerzel),
       pruefungsordnungen.value.length === 0
         ? loadPruefungsordnungen(authStore.schulformKuerzel).then(pos => { pruefungsordnungen.value = pos })
         : Promise.resolve(),
     ])
+    const lernabschnitt = k.lernabschnitt
     rawLernabschnitt.value = lernabschnitt
     schuelerStore.aktualisiereAbschluss(abschnittId, lernabschnitt)
-    const abschluss = await loadAbschlussdaten(lernabschnitt.id)
-    rawAbschlussdaten.value = abschluss.daten
-    abschlussNichtUnterstuetzt.value = abschluss.nichtUnterstuetzt
+    rawAbschlussdaten.value = k.abschlussdaten
+    abschlussNichtUnterstuetzt.value = k.abschlussNichtUnterstuetzt
     lbnwNote.value = lernabschnitt.noteLernbereichNW
 
     jahrgang.value = schuelerAbschnitt.jahrgang || null
@@ -849,54 +768,14 @@ async function laden(abschnittIdParam?: number, nachSpeichern = false) {
       ? lernabschnitt.pruefungsOrdnung
       : apoSI20Option.value.value
 
-    // Ist Prognose: beim Öffnen immer, außer Jg. 10 im 2. Halbjahr — dort ist der berechnete
-    // Abschluss der tatsächliche. Gilt auch, wenn ein anderer Wert gespeichert ist; manuell
-    // änderbar. Nach dem Speichern bleibt der gerade gespeicherte Wert stehen.
-    const abschnittNr = abschnittStore.abschnitte.find(a => a.id === abschnittId)?.abschnitt
+    // Ist Prognose: beim Öffnen nach der Standardregel, auch wenn ein anderer Wert gespeichert
+    // ist; manuell änderbar. Nach dem Speichern bleibt der gerade gespeicherte Wert stehen.
     istAbschlussPrognose.value = (nachSpeichern || nurAnsehen.value) && lernabschnitt.istAbschlussPrognose !== null
       ? lernabschnitt.istAbschlussPrognose
-      : !(Number(jahrgang.value) === 10 && abschnittNr === 2)
+      : standardIstPrognose(jahrgang.value, halbjahr.value)
 
-    const belegungen = lernabschnitt.leistungsdaten
-      .map(ld => ({ ld, fach: faecherStore.faecherMap.get(ld.fachID) }))
-      .filter((b): b is { ld: typeof b.ld; fach: FachDaten } => b.fach !== undefined)
-      // Der Server liefert die Leistungsdaten in wechselnder Reihenfolge; ohne feste Sortierung
-      // ändert sich nach dem Neuladen die Fachreihenfolge im Prognosetext
-      .sort((a, b) => a.fach.sortierung - b.fach.sortierung || a.ld.id - b.ld.id)
-    const kurse = await ladeKursKuerzel(belegungen.map(b => b.ld.kursID))
-    const rechenKuerzel = ordneRechenKuerzelZu(belegungen.map(({ ld, fach }) => ({ fach, kursart: ld.kursart })))
-
-    rohFaecher.value = belegungen.map(({ ld, fach }, i) => {
-      const noteHj = parseNoteString(ld.note)
-      const noteQ = parseNoteString(ld.noteQuartal)
-      const bezeichnung = fach.bezeichnung ?? ''
-      return {
-        kuerzel: rechenKuerzel[i],
-        bezeichnung: rechenKuerzel[i] === fach.kuerzel ? bezeichnung : `${bezeichnung} (${fach.kuerzel})`,
-        note: notenModus.value === 'quartal' ? noteQ : noteHj,
-        kursart: mapKursart(ld.kursart),
-        istFremdsprache: fach.istFremdsprache,
-        ignorieren: false,
-        noteHalbjahr: noteHj,
-        noteQuartal: noteQ,
-        asdKuerzel: fach.kuerzelStatistik ?? '',
-        // Mit Kurs, damit z.B. zweimal ER (Fachkurs und Kurs WS-3-Werte) unterscheidbar ist
-        fachKuerzel: ld.kursID !== null && kurse.get(ld.kursID) ? `${fach.kuerzel} · ${kurse.get(ld.kursID)}` : fach.kuerzel,
-        svwsId: ld.id,
-      } satisfies RohFach
-    })
-
-    faecher.value = kernfaecherNachOben(mitGespeichertenAnnahmen(rohFaecher.value.map(f => ({
-      kuerzel: f.kuerzel,
-      bezeichnung: f.bezeichnung,
-      note: notenModus.value === 'quartal' ? f.noteQuartal : f.noteHalbjahr,
-      kursart: f.kursart,
-      istFremdsprache: f.istFremdsprache,
-      ignorieren: false,
-      asdKuerzel: f.asdKuerzel,
-      fachKuerzel: f.fachKuerzel,
-      svwsId: f.svwsId,
-    }))))
+    rohFaecher.value = k.rohFaecher
+    faecher.value = faecherMitAnnahmen(k.rohFaecher, notenModus.value, gespeicherterPrognosetextVon(k, notenModus.value))
 
   } catch (e: any) {
     setzeZurueck()
@@ -908,17 +787,7 @@ async function laden(abschnittIdParam?: number, nachSpeichern = false) {
   }
 }
 
-// Kurs-Kürzel bleiben für die nächsten Schüler zwischengespeichert; schlägt das Laden fehl,
-// wird nur das Fach-Kürzel angezeigt
-const kursKuerzelCache = new Map<number, Promise<string | null>>()
-
-async function ladeKursKuerzel(ids: Array<number | null>): Promise<Map<number, string | null>> {
-  const eindeutig = [...new Set(ids.filter((id): id is number => id !== null))]
-  for (const id of eindeutig) {
-    if (!kursKuerzelCache.has(id)) kursKuerzelCache.set(id, loadKursKuerzel(id).catch(() => null))
-  }
-  return new Map(await Promise.all(eindeutig.map(async id => [id, await kursKuerzelCache.get(id)!] as const)))
-}
+const ladeKursKuerzel = erzeugeKursKuerzelLader()
 
 async function speichern() {
   if (notenGeaendert.value || faecherGeloescht.value || neueFaecherVorhanden.value) {
@@ -937,17 +806,7 @@ async function bestaetigenUndSpeichern() {
 }
 
 function verwerfenNoten() {
-  faecher.value = kernfaecherNachOben(rohFaecher.value.map(f => ({
-    kuerzel: f.kuerzel,
-    bezeichnung: f.bezeichnung,
-    note: notenModus.value === 'quartal' ? f.noteQuartal : f.noteHalbjahr,
-    kursart: f.kursart,
-    istFremdsprache: f.istFremdsprache,
-    ignorieren: false,
-    asdKuerzel: f.asdKuerzel,
-    fachKuerzel: f.fachKuerzel,
-    svwsId: f.svwsId,
-  })))
+  faecher.value = faecherOhneAnnahmen(rohFaecher.value, notenModus.value)
   lbnwNote.value = rawLernabschnitt.value?.noteLernbereichNW ?? null
   showNotenWarnung.value = false
   const nav = pendingNavigate.value
@@ -960,28 +819,16 @@ async function doSpeichern() {
   speichert.value = true
   speichernFehler.value = null
   try {
-    const body: Record<string, unknown> = {
+    await speicherePrognose({
+      lernabschnittId: rawLernabschnitt.value.id,
+      pruefungsOrdnung: selectedPO.value,
       istAbschlussPrognose: istAbschlussPrognose.value,
-    }
-    if (selectedPO.value) body.pruefungsOrdnung = selectedPO.value
-    if (lbnwNote.value !== rawLernabschnitt.value.noteLernbereichNW) {
-      body.noteLernbereichNW = lbnwNote.value
-    }
-    if (abschlussNichtUnterstuetzt.value && prognosetextSpeicherbar.value && ergebnis.value) {
-      body.textErgebnisPruefungsalgorithmus = protokollText(ergebnis.value.empfehlung, ergebnis.value.protokoll)
-    }
-    await patchLernabschnittsdaten(rawLernabschnitt.value.id, body)
-
-    // Erst nach der Prüfungsordnung, da der Server den Abschluss gegen sie prüft
-    if (abschlussWirdGespeichert.value && ergebnis.value) {
-      const felder = abschlussFelder(ergebnis.value.empfehlung)
-      const antwort = await patchAbschlussdaten(rawLernabschnitt.value.id, felder)
-      const idFeld = notenModus.value === 'quartal' ? 'idAbschlussQuartalsprognose' : 'idAbschluss'
-      // Eine im Schuljahr ungültige ID setzt der Server ohne Fehler auf null
-      if (antwort[idFeld] !== felder[idFeld]) {
-        throw new Error(`Der SVWS-Server hat den Abschluss ${ABSCHLUSS_KURZ[ergebnis.value.empfehlung]} nicht übernommen.`)
-      }
-    }
+      noteLernbereichNW: lbnwNote.value !== rawLernabschnitt.value.noteLernbereichNW ? lbnwNote.value : undefined,
+      abschlussNichtUnterstuetzt: abschlussNichtUnterstuetzt.value,
+      notenModus: notenModus.value,
+      empfehlung: ergebnis.value?.empfehlung ?? null,
+      text: protokollText(),
+    })
 
     // Gelöschte Fächer vom Server entfernen
     const vorhandeneIds = new Set(faecher.value.map(f => f.svwsId).filter((id): id is number => id !== null))
@@ -1044,17 +891,6 @@ function addFach() {
   faecher.value.push({ kuerzel: '', bezeichnung: '', note: null, kursart: 'Sonstige', istFremdsprache: false, ignorieren: false, asdKuerzel: '', fachKuerzel: '', svwsId: null })
 }
 
-function protokollText(empfehlung: AbschlussTyp, protokoll: string[]): string {
-  const kopf = `SVWS-Prognos · APO-SI20 · Jg. ${jahrgang.value ?? '–'}${halbjahr.value ? `/${halbjahr.value}. Hj.` : ''}`
-    + ` · ${notenModus.value === 'quartal' ? 'Quartalsnoten' : 'Halbjahresnoten'} · ${new Date().toLocaleString('de-DE')}`
-  const kursarten = kursartAbweichungen.value.length > 0
-    ? [KURSARTEN_PRAEFIX + kursartAbweichungen.value.join(', ')]
-    : []
-  const ausgeschlossen = ausgeschlosseneFaecher.value.length > 0
-    ? [AUSGESCHLOSSEN_PRAEFIX + ausgeschlosseneFaecher.value.join(', ')]
-    : []
-  return [kopf, `Prognose: ${ABSCHLUSS_KURZ[empfehlung]}`, ...kursarten, ...ausgeschlossen, '', ...protokoll].join('\n')
-}
 
 function protokollClass(line: string): string {
   if (line.startsWith('✓')) return 'plog plog--ok'
@@ -1076,35 +912,6 @@ function abschlussName(a: AbschlussTyp): string {
   return n[a]
 }
 
-// Fächergruppe I (D, M, E, WP) oben, danach das NW-Fach mit Fachleistungsdifferenzierung,
-// EGSN ganz unten; die übrigen Fächer behalten ihre Reihenfolge aus SVWS
-const FG1_REIHENFOLGE = ['D', 'M', 'E', 'WPU']
-const NW_FAECHER = ['BI', 'CH', 'PH']
-
-function sortierRang(fach: { kuerzel: string; kursart: string }): number {
-  const kuerzel = /^WP\d/.test(fach.kuerzel) ? 'WPU' : fach.kuerzel
-  const fg1 = FG1_REIHENFOLGE.indexOf(kuerzel)
-  if (fg1 !== -1) return fg1
-  if (NW_FAECHER.includes(kuerzel) && (fach.kursart === 'E' || fach.kursart === 'G')) return FG1_REIHENFOLGE.length
-  if (kuerzel === 'EGSN') return 99
-  return 50
-}
-
-// Bei gleichem Rang entscheidet die Position in SVWS, nicht die bisherige Zeile: So ergibt eine
-// geänderte Kursart dieselbe Reihenfolge wie nach dem Neuladen (neue Fächer ans Ende)
-function kernfaecherNachOben<T extends { kuerzel: string; kursart: string; svwsId: number | null }>(arr: T[]): T[] {
-  const svwsPos = (f: T) => {
-    const i = rohFaecher.value.findIndex(r => r.svwsId === f.svwsId)
-    return i === -1 ? Infinity : i
-  }
-  return [...arr].sort((a, b) => sortierRang(a) - sortierRang(b) || svwsPos(a) - svwsPos(b))
-}
-
-function mapKursart(k: string | null): 'E' | 'G' | 'Sonstige' {
-  if (k === 'E') return 'E'
-  if (k === 'G') return 'G'
-  return 'Sonstige'
-}
 </script>
 
 <style scoped>

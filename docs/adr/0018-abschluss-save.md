@@ -93,7 +93,7 @@ Die Konvertierung zwischen PM2-Kürzeln und SchILD-Feldwerten übernimmt
 
 ## Umsetzung in SVWS-Prognos
 
-`PrognoseView.doSpeichern()` schreibt in zwei Schritten, Zuordnung zentral in `services/schildAbschluss.ts`:
+`speicherePrognose()` in `services/prognoseBerechnung.ts` (aufgerufen von `PrognoseView.doSpeichern()`) schreibt in zwei Schritten, Zuordnung zentral in `services/schildAbschluss.ts`:
 
 1. `PATCH /db/{schema}/schueler/lernabschnittsdaten/{id}` — Prüfungsordnung, Prognose-Flag, LBNW.
 2. `PATCH /db/{schema}/abschluesse/schueler/lernabschnittsdaten/{id}` — der Abschluss selbst.
