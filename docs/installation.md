@@ -34,7 +34,7 @@ SVWS-Prognos steht in drei Varianten bereit:
 |---|---|---|
 | **Desktop-App (Windows)** | Windows 10 / 11 | `SVWS-Prognos-Setup-x.x.x.exe` |
 | **Desktop-App (Linux)** | Ubuntu, Fedora u. a. | `SVWS-Prognos-x.x.x.AppImage` |
-| **Web-Bundle** | Beliebiger Browser | `SVWS-Prognos-x.x.x-webserver.zip` |
+| **Web-App** | Beliebiger Browser, auch macOS – lokal oder auf einem Webserver | `SVWS-Prognos-x.x.x-webapp.zip` |
 
 Die aktuellen Downloads finden Sie auf der [Release-Seite des Projekts](https://github.com/SVWS-NRW/SVWS-Prognos/releases).
 
@@ -87,9 +87,21 @@ Die aktuellen Downloads finden Sie auf der [Release-Seite des Projekts](https://
 
 ---
 
+## Web-App lokal im Browser (ohne Installation)
+
+Die Web-App läuft auch ohne Webserver direkt im Browser, z. B. auf Rechnern, für die es keine Desktop-App gibt (macOS) oder auf denen nichts installiert werden darf.
+
+1. Laden Sie `SVWS-Prognos-x.x.x-webapp.zip` herunter.
+2. Entpacken Sie das Archiv in einen beliebigen Ordner.
+3. Öffnen Sie die Datei `index.html` per Doppelklick bzw. ziehen Sie sie in ein Browserfenster.
+
+Verwendet der SVWS-Server ein selbstsigniertes Zertifikat, muss der Browser diesem vertrauen, sonst scheitert die Anmeldung – siehe [SSL-Zertifikatsfehler](hilfe.md#ssl-zertifikatsfehler).
+
+---
+
 ## Betrieb als Web-App (Webserver)
 
-Wenn Sie SVWS-Prognos auf einem Schulserver als Web-Anwendung bereitstellen möchten, nutzen Sie das Web-Bundle.
+Wenn Sie SVWS-Prognos auf einem Schulserver als Web-Anwendung für mehrere Nutzer bereitstellen möchten, legen Sie die Web-App auf einen Webserver.
 
 ### Voraussetzungen
 
@@ -98,11 +110,11 @@ Wenn Sie SVWS-Prognos auf einem Schulserver als Web-Anwendung bereitstellen möc
 
 ### Schritte
 
-1. Laden Sie `SVWS-Prognos-x.x.x-webserver.zip` herunter.
+1. Laden Sie `SVWS-Prognos-x.x.x-webapp.zip` herunter.
 2. Entpacken Sie das Archiv in das Webverzeichnis Ihres Webservers, z. B.:
 
    ```bash
-   unzip SVWS-Prognos-x.x.x-webserver.zip -d /var/www/html/prognos/
+   unzip SVWS-Prognos-x.x.x-webapp.zip -d /var/www/html/prognos/
    ```
 
 3. Rufen Sie die App im Browser auf: `https://ihr-schulserver.de/prognos/`
@@ -116,7 +128,7 @@ Liegt die Web-App auf einem öffentlich erreichbaren Webspace, der SVWS-Server a
 - **Chrome/Edge:** Ohne Freigabe schlagen alle Anfragen fehl. Freigabe über das Symbol links neben der Adresse → Website-Einstellungen → „Lokales Netzwerk“ → Zulassen.
 - **Firefox:** Die Freigabe über das Berechtigungs-Symbol neben der Adresse („Auf dieses Gerät zugreifen“) reicht nicht zuverlässig: Auch dauerhaft erlaubt und nach einem Neustart scheitern viele Anfragen (Fehler „CORS Failed“, z. B. fehlende Abschlussdaten bei vielen Schülern; getestet mit Firefox 156). Stattdessen die Adresse der Web-App von der Prüfung ausnehmen:
   1. `about:config` in die Adresszeile eingeben und die Warnung bestätigen.
-  2. Nach `network.lna.skip-domains` suchen, als **Text** anlegen und den Hostnamen der Web-App eintragen, z. B. `prognos.ihre-schule.de` (ohne `https://` und ohne Pfad).
+  2. Nach `network.lna.skip-domains` suchen, als **Text** anlegen und **beide** Hostnamen kommagetrennt eintragen – den der Web-App und den des SVWS-Servers, jeweils ohne `https://`, Port und Pfad. Läuft der SVWS-Server auf dem eigenen Rechner, ist das `localhost`, z. B. `prognos.ihre-schule.de,localhost`. Der Hostname der Web-App allein reicht nicht.
   3. **Firefox komplett neu starten** – vorher wirkt die Einstellung nicht.
 
   `network.lna.blocking` = `false` ist kein Ersatz: Die Einstellung gehört zum Tracking-Schutz, und Firefox setzt sie bei „Standard“ und „Streng“ selbst wieder zurück. Außerdem würde sie für **alle** Webseiten gelten.
@@ -125,8 +137,25 @@ Verwendet der SVWS-Server ein selbstsigniertes Zertifikat, muss der Browser dies
 
 Zuverlässig ohne diese Einschränkung sind:
 
-- die **Desktop-App** (Windows/Linux), oder
-- das Web-Bundle auf einem Webserver **im selben Netz** wie der SVWS-Server bzw. unter derselben Adresse.
+- die **Desktop-App** (Windows/Linux),
+- die **Auslieferung über den SVWS-Server** (siehe nächster Abschnitt), oder
+- die Web-App auf einem Webserver **im selben Netz** wie der SVWS-Server bzw. unter derselben Adresse.
+
+---
+
+## Web-App über den SVWS-Server ausliefern (empfohlen im Schulnetz)
+
+Der SVWS-Server kann Web-Apps selbst ausliefern. Die App läuft dann unter derselben Adresse wie der Server („same origin“): Es gibt weder CORS- noch Local-Network-Access-Probleme, und es wird kein eigener Webserver benötigt.
+
+1. Im Apps-Verzeichnis des SVWS-Servers einen Ordner `prognos` anlegen. Das Verzeichnis steht in der `svwsconfig.json` unter `"Apps/Path"`, z. B. `"Apps/Path": "/opt/app/svws/apps/"`; fehlt der Eintrag, ergänzen.
+2. `SVWS-Prognos-x.x.x-webapp.zip` in diesen Ordner entpacken, sodass dort direkt die `index.html` liegt (also `…/apps/prognos/index.html`).
+3. Den SVWS-Server neu starten, z. B. `systemctl restart svws`. Der Server liest die Apps nur beim Start ein.
+4. Die App im Browser aufrufen: `https://<SVWS-Server>:8443/app/prognos`
+5. Bei der Anmeldung als Serveradresse dieselbe Adresse wie in der Adresszeile angeben, z. B. `https://<SVWS-Server>:8443`.
+
+Bei einem Update von SVWS-Prognos den Inhalt des Ordners ersetzen und den Server neu starten.
+
+Die vollständige Anleitung zum Ausliefern von Apps steht in der [SVWS-Dokumentation](https://doku.svws-nrw.de/deployment/svws-tools/).
 
 ---
 
